@@ -16,6 +16,76 @@ This means N agents can implement N nodes in parallel with zero coordination ove
 
 APSL is a first-order, indentation-sensitive DSL with Hindley-Milner type inference. A `.apsl` file declares type aliases, nodes (pure functions with contracts), and graphs (flow compositions of nodes). The compiler pipeline: parse → link (symbol discovery, no imports) → typecheck (HM unification + flow composition) → complexity proof (derived from predicate structure) → SMT predicate discharge (Z3/CVC5) → Ed25519-signed certificate. Certificates are content-addressed (sha256), stored in a flat-file sharded store, and verifiable by anyone with the signer's public key. The membership predicate — every node's derived complexity must be ≤ O(n log n) per input size variable — is the complexity gate that keeps the language honest. Multi-variable terms like O(n·m) across distinct inputs are admitted; O(n²) over a single input is not.
 
+APSL supports parameterized types: `World<S>` where `S` is the RootState identity. `World<A>` does not unify with `World<B>` — different state identities cannot compose. The flow checker supports fan-in: `flow (a, b) -> c` feeds the tuple of a's and b's outputs into c. When nodes thread `World<S>`, tuple sources flatten the World automatically: `((World<S>, X), (World<S>, Y))` becomes `(World<S>, X, Y)`.
+
+## CLI Reference
+
+### `apslc` — compiler
+
+```
+apslc parse <file>   print canonical AST to stdout
+apslc canon <file>   same — canonical form IS the serialization
+apslc hash  <file>   print sha256 hex of canonical form
+apslc check <file>   parse + link + type-check, exit 0 if clean
+apslc deploy <file>  emit GitLab child-pipeline YAML from CI/CD-definition graph
+```
+
+Flags:
+
+| Flag | What it does |
+|------|-------------|
+| `--search-path <dirs>` | Colon-separated directories to search for symbols |
+| `--no-resolve` | Disable linker (error on unresolved symbols) |
+| `--show-deps` | Print resolved dependencies |
+| `--state` | Enforce state clause validation |
+| `--nominal` | Enforce nominal type equality (no structural aliasing) |
+| `--restricted` | Enforce capability narrowing (implies --nominal) |
+| `--strict` | Reject coarse types: every type alias must resolve to a unique structure |
+| `--rooted` | Reject bare `World` (must use `World<S>`) and enforce single-root connectedness |
+| `--migrate` | Strip unknown syntax for backward-compatible validation |
+| `--attest [path]` | NO-STRINGS LAW: scan implementation source for bare/unattested string literals |
+
+With `--attest`:
+
+| Flag | What it does |
+|------|-------------|
+| `--count` | Print only the offender count (query mode, exit 0) |
+| `--ratchet <file>` | Fault only on an INCREASE vs the baseline count in `<file>` |
+| `--bless` | (with --ratchet) lower the baseline ceiling to the current count |
+
+### `apsl-lint` — complexity prover + predicate discharge
+
+```
+apsl-lint check <file>            complexity + predicates
+apsl-lint complex <file>          complexity only
+apsl-lint pred <file>             predicate discharge only
+apsl-lint explain <file> <node>   derived cost + reasoning
+```
+
+### `apsl-cert` — certificate analyzer
+
+```
+apsl-cert key new <name>             generate Ed25519 keypair
+apsl-cert emit <file> --key <name>   verify file, emit signed cert per node, store
+apsl-cert verify <hash> --pub <name>  verify a stored cert (loads <name>.pub)
+apsl-cert verify <hash> --key <name>  verify (alias for --pub)
+apsl-cert show <hash>                pretty-print a stored cert
+```
+
+Store layout: `./.apsl-store/<aa>/<bb>/<rest>.cert`
+
+### Strictness layers
+
+APSL's strictness flags compose. Each adds a constraint the compiler enforces:
+
+1. **Default** (no flags): parse + link + typecheck. Types unify structurally. `World` is a plain base type.
+2. `--nominal`: type aliases don't unify structurally — `Email` ≠ `String` even if `type Email = String`.
+3. `--restricted`: `--nominal` + capability narrowing (outputs must be narrower than inputs).
+4. `--strict`: every type alias must resolve to a unique structure (no two aliases with the same shape).
+5. `--rooted`: `World` must be `World<S>` (parameterized with a RootState). A `.apsl` file must be one weakly-connected DAG with a single entry root. Different `World<S>` identities don't compose.
+
+Flags stack: `apslc check spec.apsl --strict --rooted --state` enforces all five layers.
+
 ## Installation
 
 ```bash
