@@ -1,0 +1,229 @@
+# decomp-cofactor-cd.apsl — Atomic decomposition of Lemma 6.21c-d nodes
+#
+# Decomposes four compound proof nodes from the cofactor chain:
+#   extract_zN3_coefficient    (6.21c)
+#   derive_frobenius_equality  (6.21c)
+#   combine_norms_to_degrees   (6.21c)
+#   compute_trB3_difference    (6.21d)
+#
+# Each compound node is broken into atomic A -> B steps with
+# cx O(1) idem, carrying propositions as nominal types.
+
+
+# ─── DOMAIN TYPES (inherited from cofactor-chain.apsl) ───
+# Each type has a unique structural signature via distinct tuple shapes.
+
+type Graph = (Int, Int)
+type AdjMatrix = (Int, Int, Int)
+type Vertex = (Int, Int, Int, Int)
+type Edge = (Int, (Int, Int))
+type Degree = (Int, (Int, Int, Int))
+type N = ((Int, Int, Int), (Int, Int, Int, Int))
+type FrobeniusNorm = ((Int, Int), Int)
+type RowNorm = ((Int, Int), Int, Int)
+type TraceB3 = ((Int, Int), (Int, Int))
+
+
+# ─── PROPOSITION TYPES ───────────────────────────────────
+
+type LabeledCofactorEq = ((Int, Int), (Int, Int, Int))
+  # Coincidence cofactors are equal after sigma-relabeling for all v
+
+type CofactorAtV0 = ((Int, Int, Int), Int)
+  # Coincidence cofactors evaluated at V=0 (equation 6.9)
+
+type DeletedSubmatrix = ((Int, Int, Int), Int, Int)
+  # B = A^(sym) with row/col |v,v> deleted; cofactor = det(zI - B)
+
+type ZeroDiagonalB = ((Int, Int, Int), (Int, Int))
+  # B has zero diagonal because A^(sym)_{|v,v>,|v,v>} = 0
+
+type TraceB0 = ((Int, Int, Int), (Int, Int, Int))
+  # tr(B) = 0, so z^{N-2} coefficient of det(zI - B) is 0
+
+type ZN3Coeff = ((Int, Int, Int, Int), Int)
+  # z^{N-3} coefficient = -1/2 * tr(B^2)
+
+type TraceB2Formula = ((Int, Int, Int, Int), Int, Int)
+  # tr(B^2) = S_F - 2*R_{|v,v>} (Frobenius norm minus deleted row)
+
+type EqualZN3 = ((Int, Int, Int, Int), (Int, Int))
+  # Equal cofactors imply equal z^{N-3} coefficients
+
+type EqualRowNorms = ((Int, Int, Int, Int), (Int, Int, Int))
+  # Equal (S_F - 2*R_{|v,v>}) for G1 and G2' for all v
+
+type IsospectralAtV0 = (Int, Int, Int, Int, Int)
+  # A^(sym)_G1 and A^(sym)_G2' are isospectral (from equal char polys at V=0)
+
+type EqualTracePowers = (Int, Int, Int, Int, Int, Int)
+  # Isospectral symmetric matrices have equal traces of all powers
+
+type TraceSquaredIsFrob = (Int, (Int, Int, Int, Int))
+  # tr(A^2) = ||A||_F^2 (Frobenius norm equals sum of squared entries)
+
+type EqualFrobeniusNorms = (Int, (Int, Int, Int, Int, Int))
+  # S_F^G1 = S_F^G2'
+
+type ZN3WithFrob = ((Int, Int), (Int, Int, Int, Int))
+  # S_F^G1 - 2*R^G1 = S_F^G2' - 2*R^G2' (from z^{N-3} coefficient)
+
+type FrobCancel = (Int, Int, (Int, Int))
+  # After cancellation: R_{|v,v>}^G1 = R_{|v,v>}^G2' for all v
+
+type RowNormIsDegree = (Int, Int, (Int, Int, Int))
+  # Row norm formula: R_{|v,v>} = sum_{w!=v} 2*(A_vw)^2 = 2*deg(v)
+
+type DegreeEquality = (Int, Int, (Int, Int, Int, Int))
+  # deg_G1(v) = deg_G2'(v) for all v
+
+type FixedEdgeAndSpread = (Int, Int, Int, (Int, Int))
+  # Fixed edge {u,v} of G1, spread state |a,b> with u not in {a,b}
+
+type RestrictedB1 = (Int, Int, Int, (Int, Int, Int))
+  # B1 = A^(sym,G1) restricted to S1' = F \ {|u,v>, |u,u>}
+
+type RestrictedB2 = (Int, Int, Int, (Int, Int, Int, Int))
+  # B2 = A^(sym,G2') restricted to S2' = F \ {|a,b>, |u,u>}
+
+type RowNormSigma1 = ((Int, Int), Int, (Int, Int))
+  # Sigma1' = coincidence row norms over S1': 4|E| - 2*deg(u) - 2
+
+type RowNormSigma2 = ((Int, Int), (Int, Int), Int)
+  # Sigma2' = coincidence row norms over S2': 4|E| - 2*deg(u) - 4*A_{ab}^G2'
+
+type TraceB3Diff = ((Int, Int), (Int, Int), (Int, Int))
+  # V-coefficient of tr(B1^3) - tr(B2^3) = 3*(Sigma1' - Sigma2') = 3*(4*A_{ab} - 2)
+
+
+# ─── DECOMPOSITION: extract_zN3_coefficient ──────────────
+#
+# LabeledCofactorEq -> EqualRowNorms
+#
+# Step 1: Set V=0 in coincidence cofactor equality
+# Step 2: Cofactor = det(zI - B), B = A^(sym) with |v,v> deleted
+# Step 3: B has zero diagonal => tr(B) = 0 => z^{N-2} coeff = 0
+# Step 4: z^{N-3} coefficient = -1/2 * tr(B^2)
+# Step 5: tr(B^2) = S_F - 2*R_{|v,v>}
+# Step 6: Equal cofactors => equal z^{N-3} => equal row norms
+
+set_V_to_zero : LabeledCofactorEq -> CofactorAtV0
+  cx    O(1) idem
+
+form_deleted_submatrix : CofactorAtV0 -> DeletedSubmatrix
+  cx    O(1) idem
+
+verify_zero_diagonal : DeletedSubmatrix -> ZeroDiagonalB
+  cx    O(1) idem
+
+derive_trace_zero : ZeroDiagonalB -> TraceB0
+  cx    O(1) idem
+
+extract_zN3_coeff : TraceB0 -> ZN3Coeff
+  cx    O(1) idem
+
+expand_trB2 : ZN3Coeff -> TraceB2Formula
+  cx    O(1) idem
+
+equate_zN3_coeffs : (trace_formula: TraceB2Formula, cofactors: CofactorAtV0) -> EqualRowNorms
+  cx    O(1) idem
+
+graph decomp_extract_zN3_coefficient : LabeledCofactorEq -> EqualRowNorms
+  flow  in -> set_V_to_zero -> form_deleted_submatrix -> verify_zero_diagonal -> derive_trace_zero -> extract_zN3_coeff -> expand_trB2
+  flow  (expand_trB2, set_V_to_zero) -> equate_zN3_coeffs -> out
+
+
+# ─── DECOMPOSITION: derive_frobenius_equality ────────────
+#
+# EqualRowNorms -> EqualFrobeniusNorms
+#
+# Step 1: From equal char polys at V=0: matrices are isospectral
+# Step 2: Isospectral symmetric => equal traces of all powers
+# Step 3: tr(A^2) = ||A||_F^2
+# Step 4: Therefore S_F^G1 = S_F^G2'
+
+establish_isospectrality : EqualRowNorms -> IsospectralAtV0
+  cx    O(1) idem
+
+isospectral_to_trace_powers : IsospectralAtV0 -> EqualTracePowers
+  cx    O(1) idem
+
+trace_squared_is_frobenius : EqualTracePowers -> TraceSquaredIsFrob
+  cx    O(1) idem
+
+conclude_frobenius_equality : TraceSquaredIsFrob -> EqualFrobeniusNorms
+  cx    O(1) idem
+
+graph decomp_derive_frobenius_equality : EqualRowNorms -> EqualFrobeniusNorms
+  flow  in -> establish_isospectrality -> isospectral_to_trace_powers -> trace_squared_is_frobenius -> conclude_frobenius_equality -> out
+
+
+# ─── DECOMPOSITION: combine_norms_to_degrees ─────────────
+#
+# (EqualFrobeniusNorms, EqualRowNorms) -> DegreeEquality
+#
+# Step 1: Write z^{N-3} equality: S_F - 2*R = S_F' - 2*R'
+# Step 2: S_F = S_F' (from Frobenius equality)
+# Step 3: Cancel: R_{|v,v>}^G1 = R_{|v,v>}^G2'
+# Step 4: Row norm = 2*deg(v) for simple graphs
+# Step 5: Equal row norms => equal degrees
+
+write_zN3_equality : (frob: EqualFrobeniusNorms, row: EqualRowNorms) -> ZN3WithFrob
+  cx    O(1) idem
+
+cancel_frobenius_terms : ZN3WithFrob -> FrobCancel
+  cx    O(1) idem
+
+row_norm_is_degree : FrobCancel -> RowNormIsDegree
+  cx    O(1) idem
+
+equal_norms_to_degrees : RowNormIsDegree -> DegreeEquality
+  cx    O(1) idem
+
+graph decomp_combine_norms_to_degrees : (EqualFrobeniusNorms, EqualRowNorms) -> DegreeEquality
+  flow  in -> write_zN3_equality -> cancel_frobenius_terms -> row_norm_is_degree -> equal_norms_to_degrees -> out
+
+
+# ─── DECOMPOSITION: compute_trB3_difference ──────────────
+#
+# (LabeledCofactorEq, DegreeEquality) -> TraceB3Diff
+#
+# Step 1: Fix edge {u,v} of G1, spread state |a,b> with u not in {a,b}
+# Step 2: B1 = A^(sym,G1) restricted to S1' = F \ {|u,v>, |u,u>}
+# Step 3: B2 = A^(sym,G2') restricted to S2' = F \ {|a,b>, |u,u>}
+# Step 4: Sigma1' = row norms over S1': 4|E| - 2*deg(u) - 2
+# Step 5: Sigma2' = row norms over S2': 4|E| - 2*deg(u) - 4*A_{ab}
+# Step 6: V-coeff of tr(B1^3) - tr(B2^3) = 3*(Sigma1' - Sigma2') = 3*(4*A_{ab} - 2)
+
+split_cofactor_input : (LabeledCofactorEq, DegreeEquality) -> LabeledCofactorEq
+  cx    O(1) idem
+
+split_degree_input : (LabeledCofactorEq, DegreeEquality) -> DegreeEquality
+  cx    O(1) idem
+
+fix_edge_and_spread : LabeledCofactorEq -> FixedEdgeAndSpread
+  cx    O(1) idem
+
+restrict_B1 : (config: FixedEdgeAndSpread, degrees: DegreeEquality) -> RestrictedB1
+  cx    O(1) idem
+
+restrict_B2 : (config: FixedEdgeAndSpread, degrees: DegreeEquality) -> RestrictedB2
+  cx    O(1) idem
+
+compute_sigma1_row_norms : RestrictedB1 -> RowNormSigma1
+  cx    O(1) idem
+
+compute_sigma2_row_norms : RestrictedB2 -> RowNormSigma2
+  cx    O(1) idem
+
+compute_trace_diff : (s1: RowNormSigma1, s2: RowNormSigma2) -> TraceB3Diff
+  cx    O(1) idem
+
+graph decomp_compute_trB3_difference : (LabeledCofactorEq, DegreeEquality) -> TraceB3Diff
+  flow  in -> split_cofactor_input -> fix_edge_and_spread
+  flow  in -> split_degree_input
+  flow  (fix_edge_and_spread, split_degree_input) -> restrict_B1
+  flow  (fix_edge_and_spread, split_degree_input) -> restrict_B2
+  flow  restrict_B1 -> compute_sigma1_row_norms
+  flow  restrict_B2 -> compute_sigma2_row_norms
+  flow  (compute_sigma1_row_norms, compute_sigma2_row_norms) -> compute_trace_diff -> out

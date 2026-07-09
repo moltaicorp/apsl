@@ -1,0 +1,12 @@
+type ReadCap = String
+type WriteCap = String
+
+read_resource : ReadCap -> ReadCap
+  cx O(1) idem
+
+write_resource : WriteCap -> WriteCap
+  cx O(1) idem
+
+# This graph incorrectly passes ReadCap output to WriteCap input
+graph confused_pipeline : ReadCap -> WriteCap
+  flow in -> read_resource -> write_resource -> out

@@ -1,0 +1,86 @@
+# spectral-rigidity.apsl — Theorem 5.6 (Spectral Rigidity)
+#
+# Eschabot n^17 proof decomposition.
+#
+# Input: two symmetric matrices A_1, A_2 with equal characteristic
+# polynomials under all pairwise-sum perturbations (spectral equivalence).
+# Output: there exists a diagonal sign matrix Q such that A_2 = Q A_1 Q.
+#
+# Three atomic steps:
+#   1. First-order perturbation  => diagonal entries equal
+#   2. Second-order perturbation => off-diagonal magnitudes equal
+#   3. Non-negativity conclusion  => full sign-conjugation equivalence
+
+
+# ─── DOMAIN TYPES ────────────────────────────────────────
+#
+# Types ARE propositions. Each type represents a mathematical object
+# or a proven mathematical fact witnessed by the data it carries.
+
+type Matrix = (String, String)
+
+type SignMatrix = (String, String, String)
+
+type Potential = (String, String, String, String)
+
+type SpectralHypothesis = (Matrix, Matrix, Potential)
+  # Witness: (A_1, A_2, V_0) where A_1, A_2 are spectrally equivalent
+  # under perturbation by generic potential V_0 with distinct diagonal
+  # entries. spec(Delta(V_0) + t A_1) = spec(Delta(V_0) + t A_2) for all t.
+
+type DiagonalEqual = (Matrix, Matrix, Int)
+  # Proven: (A_1)_kk = (A_2)_kk for all k.
+
+type MagnitudeEqual = (Matrix, Matrix, Int, Int)
+  # Proven: |A_1_kj|^2 = |A_2_kj|^2 for all k != j.
+
+type SignConjugate = (Matrix, Matrix, SignMatrix)
+  # Proven: A_2 = Q A_1 Q for diagonal sign matrix Q.
+
+
+# ─── STEP 1: First-order perturbation (diagonal entries) ─
+#
+# Fix generic V_0 with distinct diagonal entries. Form
+# M_l(t) = Delta(V_0) + t A_l. By Rellich's theorem, eigenvalues
+# are analytic in t. Equal spectra at all t implies equal first-order
+# Rayleigh-Schrodinger coefficients. The first-order coefficient for
+# lambda_k is (A_l)_kk. Therefore (A_1)_kk = (A_2)_kk for all k.
+
+first_order_diagonal : SpectralHypothesis -> DiagonalEqual
+  cx    O(1) idem
+
+
+# ─── STEP 2: Second-order perturbation (off-diagonal magnitudes)
+#
+# The second-order Rayleigh-Schrodinger correction involves
+# |A_kj|^2 / (l_k - l_j) for k != j. Varying V_0 over parameter s,
+# these produce rational functions with simple poles. Equal spectra
+# imply equal rational functions, hence equal residues at each pole.
+# The residue at (l_k = l_j) isolates |A_kj|^2. Therefore
+# |A_1_kj|^2 = |A_2_kj|^2 for all k != j.
+
+second_order_magnitude : (SpectralHypothesis, DiagonalEqual) -> MagnitudeEqual
+  cx    O(1) idem
+
+
+# ─── STEP 3: Non-negativity conclusion ──────────────────
+#
+# A^(sym) entries are non-negative (0, 1, or sqrt(2)). Equal squared
+# magnitudes imply equal entries. With diagonal equality from Step 1,
+# A_1 = A_2 up to diagonal sign conjugation Q.
+
+nonneg_sign_conjugation : (DiagonalEqual, MagnitudeEqual) -> SignConjugate
+  cx    O(1) idem
+
+
+# ─── THEOREM 5.6 GRAPH ──────────────────────────────────
+#
+# Linear composition of the three proof steps.
+# Step 1 extracts diagonal equality from the spectral hypothesis.
+# Step 2 uses the hypothesis + diagonal equality for magnitudes.
+# Step 3 closes: diagonal + magnitude equality => sign conjugation.
+
+graph spectral_rigidity : SpectralHypothesis -> SignConjugate
+  flow  in -> first_order_diagonal
+  flow  (in, first_order_diagonal) -> second_order_magnitude
+  flow  (first_order_diagonal, second_order_magnitude) -> nonneg_sign_conjugation -> out

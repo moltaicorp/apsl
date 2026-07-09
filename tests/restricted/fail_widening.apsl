@@ -1,0 +1,17 @@
+type FullAccess = String
+type ReadWriteCap <: FullAccess = String
+type ReadCap <: ReadWriteCap = String
+
+read_handler : ReadCap -> ReadCap
+  cx O(1) idem
+
+rw_handler : ReadWriteCap -> ReadWriteCap
+  cx O(1) idem
+
+full_handler : FullAccess -> FullAccess
+  cx O(1) idem
+
+# This graph widens: rw_handler outputs ReadWriteCap but read_handler expects ReadCap
+# ReadWriteCap is NOT a subtype of ReadCap — this is capability widening
+graph widening_pipeline : ReadWriteCap -> ReadCap
+  flow in -> rw_handler -> read_handler -> out

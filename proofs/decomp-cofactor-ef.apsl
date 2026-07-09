@@ -1,0 +1,191 @@
+# decomp-cofactor-ef.apsl — Atomic decomposition of cofactor chain 6.21e–f
+#
+# Decomposes four compound proof nodes into atomic APSL primitives:
+#   evaluate_pinned_cofactors  : (PinnedBijection, DegreeEquality) -> RowNormFormula
+#   extract_row_norm_equation  : RowNormFormula -> EqualRowNorms
+#   solve_edge_weight          : (EqualRowNorms, DegreeEquality) -> EdgePreservation
+#   lift_to_full_matrix        : EdgePreservation -> AdjacencyEquality
+#
+# Math: from pinned bijection phi(|u,v>) = |u,v>) for every edge {u,v},
+# substitute into cofactor equality, set V=0, extract z^{N-3} coefficient,
+# compute row norms of A^(sym), cancel degrees, conclude A(G1) = A(G2').
+
+
+# ─── TYPE ALIASES ────────────────────────────────────────
+
+type PinnedBijection = (Int, Int)
+  # phi(|u,v>) = |u,v>) for every edge {u,v}
+
+type DegreeEquality = (Int, Bool)
+  # deg_G1(v) = deg_G2'(v) for all v
+
+type PinnedCofactorEquality = (Int, String)
+  # c_{|u,v>}^G1(z;V,0) = c_{|u,v>}^G2'(z;V,0) for every edge {u,v}
+
+type CofactorAtV0 = (Int, Real)
+  # Cofactor equality specialized to V=0: submatrix char polys equal
+
+type ZN3Coefficient = (Int, Int, Int)
+  # z^{N-3} coefficient equality: restricted Frobenius = restricted Frobenius
+
+type RowNormFormula = (Int, Int, Bool)
+  # R_{|u,v>} = 2*A_{uv} + deg(u) + deg(v)
+
+type CoincidenceContribution = (Int, Int, String)
+  # Coincidence coupling contributes 4*A_{uv} to row norm
+
+type SpreadContribution = (Int, Int, Real)
+  # Spread coupling contributes (deg(u) - A_{uv}) + (deg(v) - A_{uv})
+
+type EqualRowNorms = (Int, Bool, Bool)
+  # R_{|u,v>}^G1 = R_{|u,v>}^G2' for every edge {u,v}
+
+type EdgeWeightEquation = (Int, Bool, String)
+  # 2*A_{uv}^G1 + deg(u) + deg(v) = 2*A_{uv}^G2' + deg(u) + deg(v)
+
+type DegreeCancellation = (Int, Bool, Real)
+  # After cancelling degrees: 2*A_{uv}^G1 = 2*A_{uv}^G2'
+
+type EdgePreservation = (Int, String, String)
+  # A_{uv}^G1 = A_{uv}^G2' for all u,v
+
+type EdgeSubsetInclusion = (Int, String, Real)
+  # E(G1) subset E(G2')
+
+type EqualEdgeCounts = (Int, Real, Real)
+  # |E(G1)| = |E(G2)|
+
+type EdgeSetEquality = (Int, Int, Int, Int)
+  # E(G1) = E(G2')
+
+type NonEdgeClosure = (Int, Int, Int, Bool)
+  # A_{uv}^G2' = 0 for every non-edge of G1
+
+type AdjacencyEquality = (Int, Int, Int, String)
+  # A(G1) = A(G2')
+
+
+# ─── EVALUATE PINNED COFACTORS ───────────────────────────
+#
+# From pinning: phi(|u,v>) = |u,v>) for every edge {u,v}.
+# Substitute into cofactor equality, set V=0, extract z^{N-3}.
+
+substitute_pinning : PinnedBijection -> PinnedCofactorEquality
+  cx    O(1) idem
+  # phi fixes |u,v> => cofactor at |u,v> in G1 equals cofactor at |u,v> in G2'
+
+specialize_V0 : PinnedCofactorEquality -> CofactorAtV0
+  cx    O(1) idem
+  # Set V=0: cofactor becomes char poly of (N-1)x(N-1) submatrix
+
+extract_zN3 : CofactorAtV0 -> ZN3Coefficient
+  cx    O(1) idem
+  # z^{N-3} coefficient = restricted Frobenius norm - 2*row_norm
+
+derive_row_norm_formula : ZN3Coefficient -> RowNormFormula
+  cx    O(1) idem
+  # Isolate row norm: R_{|u,v>} equals Frobenius minus z^{N-3} term
+
+graph evaluate_pinned_cofactors : PinnedBijection -> RowNormFormula
+  flow  in -> substitute_pinning -> specialize_V0 -> extract_zN3 -> derive_row_norm_formula -> out
+
+
+# ─── EXTRACT ROW NORM EQUATION ───────────────────────────
+#
+# Row |u,v> of A^(sym) has three coupling types:
+#   Coincidence: sqrt(2)*A_{uv} to |u,u> and |v,v> => squared = 2*A_{uv} each => 4*A_{uv}
+#   Spread (shared u): sum_{w != u,v} A_{vw} = deg(v) - A_{uv}
+#   Spread (shared v): sum_{w != u,v} A_{uw} = deg(u) - A_{uv}
+# Total: R = 4*A_{uv} + deg(v) - A_{uv} + deg(u) - A_{uv} = 2*A_{uv} + deg(u) + deg(v)
+# Equal row norms: R^G1 = R^G2'
+
+compute_coincidence : RowNormFormula -> CoincidenceContribution
+  cx    O(1) idem
+  # sqrt(2)*A_{uv} to |u,u> and |v,v>; squared sum = 4*A_{uv}
+
+compute_spread : RowNormFormula -> SpreadContribution
+  cx    O(1) idem
+  # Shared-u: deg(v) - A_{uv}; shared-v: deg(u) - A_{uv}
+
+sum_to_row_norm : (CoincidenceContribution, SpreadContribution) -> RowNormFormula
+  cx    O(1) idem
+  # 4*A_{uv} + (deg(v) - A_{uv}) + (deg(u) - A_{uv}) = 2*A_{uv} + deg(u) + deg(v)
+
+equate_row_norms : RowNormFormula -> EqualRowNorms
+  cx    O(1) idem
+  # Equal submatrix traces => R^G1 = R^G2'
+
+graph extract_row_norm_equation : RowNormFormula -> EqualRowNorms
+  flow  in -> compute_coincidence
+  flow  in -> compute_spread
+  flow  (compute_coincidence, compute_spread) -> sum_to_row_norm -> equate_row_norms -> out
+
+
+# ─── SOLVE EDGE WEIGHT ───────────────────────────────────
+#
+# 2*A_{uv}^G1 + deg(u) + deg(v) = 2*A_{uv}^G2' + deg(u) + deg(v)
+# Degrees cancel by DegreeEquality. Divide by 2.
+
+form_edge_equation : (EqualRowNorms, DegreeEquality) -> EdgeWeightEquation
+  cx    O(1) idem
+  # Expand row norm equality using formula: 2*A^G1 + deg(u) + deg(v) = ...
+
+cancel_degrees : (EdgeWeightEquation, DegreeEquality) -> DegreeCancellation
+  cx    O(1) idem
+  # deg_G1 = deg_G2' => cancel: 2*A_{uv}^G1 = 2*A_{uv}^G2'
+
+divide_by_two : DegreeCancellation -> EdgePreservation
+  cx    O(1) idem
+  # A_{uv}^G1 = A_{uv}^G2'
+
+extract_degrees_sw : (EqualRowNorms, DegreeEquality) -> DegreeEquality
+  cx    O(1) idem
+  # Pass through DegreeEquality from input tuple
+
+graph solve_edge_weight : (EqualRowNorms, DegreeEquality) -> EdgePreservation
+  flow  in -> form_edge_equation
+  flow  in -> extract_degrees_sw
+  flow  (form_edge_equation, extract_degrees_sw) -> cancel_degrees -> divide_by_two -> out
+
+
+# ─── LIFT TO FULL MATRIX ────────────────────────────────
+#
+# Edge preservation => E(G1) subset E(G2'). Equal edge counts
+# (from degree sum). Subset + equal size => E(G1) = E(G2').
+# Non-edge closure: deg equality forces zero on remaining entries.
+# Combined: A(G1) = A(G2').
+
+extract_edge_pres : (EdgePreservation, DegreeEquality) -> EdgePreservation
+  cx    O(1) idem
+  # Extract EdgePreservation from input tuple
+
+extract_degrees_lm : (EdgePreservation, DegreeEquality) -> DegreeEquality
+  cx    O(1) idem
+  # Extract DegreeEquality from input tuple
+
+edge_subset : EdgePreservation -> EdgeSubsetInclusion
+  cx    O(1) idem
+  # A_{uv}^G1 = A_{uv}^G2' for edges => E(G1) subset E(G2')
+
+count_edges : DegreeEquality -> EqualEdgeCounts
+  cx    O(1) idem
+  # sum of degrees / 2 = |E|; equal degrees => equal edge counts
+
+conclude_edge_equality : (EdgeSubsetInclusion, EqualEdgeCounts) -> EdgeSetEquality
+  cx    O(1) idem
+  # E(G1) subset E(G2') and |E(G1)| = |E(G2')| => E(G1) = E(G2')
+
+close_nonedges : (EdgeSetEquality, DegreeEquality) -> NonEdgeClosure
+  cx    O(1) idem
+  # deg_G2'(v) = edges-from-G1 + edges-not-from-G1; first = deg_G1(v); second = 0
+
+combine_adjacency : (EdgeSetEquality, NonEdgeClosure) -> AdjacencyEquality
+  cx    O(1) idem
+  # Edges match and non-edges match => A(G1) = A(G2')
+
+graph lift_to_full_matrix : (EdgePreservation, DegreeEquality) -> AdjacencyEquality
+  flow  in -> extract_edge_pres -> edge_subset
+  flow  in -> extract_degrees_lm -> count_edges
+  flow  (edge_subset, count_edges) -> conclude_edge_equality
+  flow  (conclude_edge_equality, extract_degrees_lm) -> close_nonedges
+  flow  (conclude_edge_equality, close_nonedges) -> combine_adjacency -> out

@@ -1,0 +1,267 @@
+# decomp-rigidity.apsl — Atomic decomposition of 4 compound proof nodes
+# from the SPECTRAL RIGIDITY stage of Eschabot's n^17 proof.
+#
+# Each sub-node is exactly ONE logical primitive:
+#   substitution, modus ponens, universal/existential instantiation,
+#   conjunction/disjunction intro/elim, equality transitivity,
+#   or direct axiom citation.
+#
+# Nodes decomposed:
+#   1. first_order_diagonal   : SpectralHypothesis -> DiagonalEqual
+#   2. second_order_magnitude : (SpectralHypothesis, DiagonalEqual) -> MagnitudeEqual
+#   3. unitary_conjugation    : (GraphIso, FockLift) -> TimeEvoEquiv
+#   4. support_connected      : (SupportGraph, Connected) -> SupportConnected
+
+
+# ════════════════════════════════════════════════════════════
+# TYPES
+# ════════════════════════════════════════════════════════════
+
+type Matrix = (Int, Int)
+type SignMatrix = (Int, Int, Int)
+type Potential = (Int, Int, Int, Int)
+type Permutation = (Int, Int, Int, Int, Int)
+type Operator = (Int, Int, Int, Int, Int, Int)
+type Graph = (Int, Int, Int, Int, Int, Int, Int)
+type FockState = (Int, Int, Int, Int, Int, Int, Int, Int)
+type FockSpace = (Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+# --- Core proposition types ---
+
+type SpectralHypothesis = (Matrix, Matrix, Potential)
+
+type DiagonalEqual = (Matrix, Matrix, Int)
+
+type MagnitudeEqual = (Matrix, Matrix, Int, Int)
+
+type GraphIso = (Graph, Graph, Permutation)
+
+type FockLift = (Permutation, Operator, Int)
+
+type TimeEvoEquiv = (Operator, Operator)
+
+type SupportGraph = (Operator, Graph)
+
+type Connected = (Graph, Graph)
+
+type SupportConnected = (SupportGraph, Connected, Int)
+
+# --- first_order_diagonal intermediate types ---
+
+type GenericPotential = Potential
+
+type OneParamFamily = (Matrix, Potential, Int)
+
+type AnalyticEigenvalues = (OneParamFamily, OneParamFamily)
+
+type EqualAnalyticContinuations = (AnalyticEigenvalues, AnalyticEigenvalues)
+
+type EqualFirstOrderCoeffs = (Matrix, Matrix, Int, Int, Int)
+
+# --- second_order_magnitude intermediate types ---
+
+type SOMInput = (SpectralHypothesis, DiagonalEqual)
+
+type SecondOrderFormula = (Matrix, Potential, Int, Int)
+
+type ParameterizedCorrection = (SecondOrderFormula, Potential)
+
+type RationalFunction = (ParameterizedCorrection, ParameterizedCorrection)
+
+type EqualRationalFunctions = (RationalFunction, RationalFunction)
+
+type EqualResidues = (Matrix, Matrix, Int, Int, Int, Int)
+
+# --- unitary_conjugation intermediate types ---
+
+type UCInput = (GraphIso, FockLift)
+
+type ConjugatedHamiltonian = (Permutation, Operator, Operator)
+
+type ExponentialCommutes = (Permutation, Operator, Int, Int)
+
+# --- support_connected intermediate types ---
+
+type SCInput = (SupportGraph, Connected, Int, Int)
+
+type PathExists = (FockState, FockState, Graph, Int)
+
+type SecondPathExists = (FockState, FockState, Graph, Int, Int)
+
+type FirstBosonMoved = (FockState, FockState, Int)
+
+type SecondBosonMoved = (FockState, FockState, Int, Int)
+
+type ConcatenatedPath = (FockState, FockState, Int, Int, Int)
+
+type ArbitraryStatesConnected = (FockSpace, Graph)
+
+
+# ════════════════════════════════════════════════════════════
+# NODE 1: first_order_diagonal
+# SpectralHypothesis -> DiagonalEqual
+#
+# Single-input graph: `in` is SpectralHypothesis directly.
+# ════════════════════════════════════════════════════════════
+
+# Step 1: Existential instantiation — Corollary 5.5 gives generic V_0
+fix_generic_potential : SpectralHypothesis -> GenericPotential
+  cx    O(1) idem
+
+# Step 2: Substitution — form M_l(t) = Delta(V_0) + t*A_l for l=1,2
+form_one_param_family : (SpectralHypothesis, GenericPotential) -> OneParamFamily
+  cx    O(1) idem
+
+# Step 3: Axiom citation — Rellich's theorem: eigenvalues analytic in t
+apply_rellich_theorem : OneParamFamily -> AnalyticEigenvalues
+  cx    O(1) idem
+
+# Step 4: Modus ponens — equal spectra for all t => equal analytic continuations
+equal_spectra_to_equal_analytic : (SpectralHypothesis, AnalyticEigenvalues) -> EqualAnalyticContinuations
+  cx    O(1) idem
+
+# Step 5: Substitution — first-order coefficient mu_k'(0) = (A_l)_kk
+extract_first_order_coeffs : EqualAnalyticContinuations -> EqualFirstOrderCoeffs
+  cx    O(1) idem
+
+# Step 6: Equality transitivity — equal first-order coeffs => diagonal equality
+first_order_to_diagonal : EqualFirstOrderCoeffs -> DiagonalEqual
+  cx    O(1) idem
+
+graph first_order_diagonal : SpectralHypothesis -> DiagonalEqual
+  flow  in -> fix_generic_potential
+  flow  (in, fix_generic_potential) -> form_one_param_family -> apply_rellich_theorem
+  flow  (in, apply_rellich_theorem) -> equal_spectra_to_equal_analytic -> extract_first_order_coeffs -> first_order_to_diagonal -> out
+
+
+# ════════════════════════════════════════════════════════════
+# NODE 2: second_order_magnitude
+# (SpectralHypothesis, DiagonalEqual) -> MagnitudeEqual
+#
+# Two-input graph: `in` is (SpectralHypothesis, DiagonalEqual).
+# We use projection nodes to extract each component.
+# ════════════════════════════════════════════════════════════
+
+# Projection: conjunction elimination — extract SpectralHypothesis from pair
+som_extract_hyp : SOMInput -> SpectralHypothesis
+  cx    O(1) idem
+
+# Projection: conjunction elimination — extract DiagonalEqual from pair
+som_extract_diag : SOMInput -> DiagonalEqual
+  cx    O(1) idem
+
+# Step 1: Axiom citation — Rayleigh-Schrodinger second-order formula
+write_second_order_formula : SpectralHypothesis -> SecondOrderFormula
+  cx    O(1) idem
+
+# Step 2: Substitution — parameterize V_0 along direction u; gaps rational in s
+parameterize_gaps : (SecondOrderFormula, SpectralHypothesis) -> ParameterizedCorrection
+  cx    O(1) idem
+
+# Step 3: Conjunction introduction — pair corrections for A_1, A_2 as rational functions
+pair_rational_functions : (ParameterizedCorrection, DiagonalEqual) -> RationalFunction
+  cx    O(1) idem
+
+# Step 4: Modus ponens — equal spectra => equal rational functions
+equal_spectra_to_equal_rational : (SpectralHypothesis, RationalFunction) -> EqualRationalFunctions
+  cx    O(1) idem
+
+# Step 5: Axiom citation — partial fractions uniqueness: equal rational fns => equal residues
+partial_fractions_uniqueness : EqualRationalFunctions -> EqualResidues
+  cx    O(1) idem
+
+# Step 6: Substitution — each residue isolates |A_kj|^2; equal residues => equal magnitudes
+residues_to_magnitudes : EqualResidues -> MagnitudeEqual
+  cx    O(1) idem
+
+graph second_order_magnitude : SOMInput -> MagnitudeEqual
+  flow  in -> som_extract_hyp
+  flow  in -> som_extract_diag
+  flow  som_extract_hyp -> write_second_order_formula
+  flow  (write_second_order_formula, som_extract_hyp) -> parameterize_gaps
+  flow  (parameterize_gaps, som_extract_diag) -> pair_rational_functions
+  flow  (som_extract_hyp, pair_rational_functions) -> equal_spectra_to_equal_rational -> partial_fractions_uniqueness -> residues_to_magnitudes -> out
+
+
+# ════════════════════════════════════════════════════════════
+# NODE 3: unitary_conjugation
+# (GraphIso, FockLift) -> TimeEvoEquiv
+#
+# Two-input graph: `in` is (GraphIso, FockLift).
+# ════════════════════════════════════════════════════════════
+
+# Projection: conjunction elimination — extract GraphIso from pair
+uc_extract_iso : UCInput -> GraphIso
+  cx    O(1) idem
+
+# Projection: conjunction elimination — extract FockLift from pair
+uc_extract_lift : UCInput -> FockLift
+  cx    O(1) idem
+
+# Step 1: Axiom citation — Corollary 2.8: pi_hat H_j(G1) pi_hat^T = H_{pi(j)}(G2)
+apply_corollary_2_8 : (GraphIso, FockLift) -> ConjugatedHamiltonian
+  cx    O(1) idem
+
+# Step 2: Axiom citation — matrix exponential commutes with conjugation
+exponential_conjugation_commutes : ConjugatedHamiltonian -> ExponentialCommutes
+  cx    O(1) idem
+
+# Step 3: Substitution — substitute conjugated Hamiltonian into exponential
+substitute_time_evolution : (ExponentialCommutes, ConjugatedHamiltonian) -> TimeEvoEquiv
+  cx    O(1) idem
+
+graph unitary_conjugation : UCInput -> TimeEvoEquiv
+  flow  in -> uc_extract_iso
+  flow  in -> uc_extract_lift
+  flow  (uc_extract_iso, uc_extract_lift) -> apply_corollary_2_8 -> exponential_conjugation_commutes
+  flow  (exponential_conjugation_commutes, apply_corollary_2_8) -> substitute_time_evolution -> out
+
+
+# ════════════════════════════════════════════════════════════
+# NODE 4: support_connected
+# (SupportGraph, Connected) -> SupportConnected
+#
+# Two-input graph: `in` is (SupportGraph, Connected).
+# ════════════════════════════════════════════════════════════
+
+# Projection: conjunction elimination — extract SupportGraph from pair
+sc_extract_support : SCInput -> SupportGraph
+  cx    O(1) idem
+
+# Projection: conjunction elimination — extract Connected from pair
+sc_extract_connected : SCInput -> Connected
+  cx    O(1) idem
+
+# Step 1: Universal instantiation — for any vertices a,c, connected G gives path
+instantiate_path_first_pair : Connected -> PathExists
+  cx    O(1) idem
+
+# Step 2: Universal instantiation — for any vertices b,d, connected G gives path
+instantiate_path_second_pair : Connected -> SecondPathExists
+  cx    O(1) idem
+
+# Step 3: Modus ponens — G-adjacency u_{i-1}~u_i => Fock transitions |u_{i-1},b> ~ |u_i,b>
+move_first_boson : (PathExists, SupportGraph) -> FirstBosonMoved
+  cx    O(1) idem
+
+# Step 4: Modus ponens — G-adjacency w_{i-1}~w_i => Fock transitions |c,w_{i-1}> ~ |c,w_i>
+move_second_boson : (SecondPathExists, SupportGraph) -> SecondBosonMoved
+  cx    O(1) idem
+
+# Step 5: Equality transitivity — concatenate Gamma-paths: |a,b> -> |c,b> -> |c,d>
+concatenate_paths : (FirstBosonMoved, SecondBosonMoved) -> ConcatenatedPath
+  cx    O(1) idem
+
+# Step 6: Universal generalization — arbitrary Fock states connected => Gamma connected
+generalize_connectivity : (ConcatenatedPath, SupportGraph) -> SupportConnected
+  cx    O(1) idem
+
+graph support_connected : SCInput -> SupportConnected
+  flow  in -> sc_extract_support
+  flow  in -> sc_extract_connected
+  flow  sc_extract_connected -> instantiate_path_first_pair
+  flow  sc_extract_connected -> instantiate_path_second_pair
+  flow  (instantiate_path_first_pair, sc_extract_support) -> move_first_boson
+  flow  (instantiate_path_second_pair, sc_extract_support) -> move_second_boson
+  flow  (move_first_boson, move_second_boson) -> concatenate_paths
+  flow  (concatenate_paths, sc_extract_support) -> generalize_connectivity -> out

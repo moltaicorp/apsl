@@ -1,0 +1,6 @@
+# A node that nests two quantifiers over the same input — derived O(n^2).
+# The linter must reject this and hint toward gather/scatter/map-reduce.
+
+all_pairs_distinct : Int[] -> Bool
+  post  forall x in in. forall y in in. x != y or x = y
+  cx    O(n log n) idem

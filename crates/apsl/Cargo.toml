@@ -1,0 +1,24 @@
+[package]
+name = "apsl"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "apsl"
+path = "src/main.rs"
+
+[dependencies]
+apsl-core.workspace = true
+apsl-parse = { path = "../apsl-parse" }
+apsl-types = { path = "../apsl-types" }
+apsl-link  = { path = "../apsl-link" }
+apsl-runtime = { path = "../apsl-runtime" }
+
+serde.workspace = true
+serde_json.workspace = true
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

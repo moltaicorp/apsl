@@ -1,0 +1,16 @@
+[package]
+name = "apsl-cert-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "apsl-cert"
+path = "src/main.rs"
+
+[dependencies]
+apsl-core.workspace = true
+apsl-cert.workspace = true
+apsl-parse.workspace = true
+apsl-types.workspace = true
+apsl-complex = { path = "../apsl-complex" }
+apsl-smt.workspace = true

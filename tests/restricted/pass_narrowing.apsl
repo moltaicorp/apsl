@@ -1,0 +1,15 @@
+type FullAccess = String
+type ReadWriteCap <: FullAccess = String
+type ReadCap <: ReadWriteCap = String
+
+full_handler : FullAccess -> ReadWriteCap
+  cx O(1) idem
+
+rw_handler : ReadWriteCap -> ReadCap
+  cx O(1) idem
+
+# Each step narrows: FullAccess -> ReadWriteCap -> ReadCap
+# ReadWriteCap <: FullAccess (valid input to full_handler)
+# ReadCap <: ReadWriteCap (valid output narrowing)
+graph narrowing_pipeline : FullAccess -> ReadCap
+  flow in -> full_handler -> rw_handler -> out

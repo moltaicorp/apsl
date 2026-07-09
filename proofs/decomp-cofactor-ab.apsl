@@ -1,0 +1,254 @@
+# decomp-cofactor-ab.apsl — Atomic decomposition of Lemmas 6.21a–6.21b
+#
+# Decomposes compound proof nodes from cofactor-chain.apsl into
+# atomic APSL primitives. Each node is a single logical inference step.
+#
+# Cofactor chain nodes decomposed:
+#   6.21a: extract_outer_multisets, construct_bijection_sigma, verify_coeff_agreement
+#   6.21b: relabel_by_sigma, identify_epsilon_independent, match_coincidence_cofactors
+
+
+# ─── DOMAIN TYPES ────────────────────────────────────────
+
+type Graph = (Int, Int)
+type AdjMatrix = (Int, Bool)
+type Vertex = (Int, String)
+type N = (Int, Real)
+type Polynomial = (Int, Int, Int)
+type Multiset = (Int, Int, Bool)
+type Matrix = (Int, Int, String)
+
+# ─── PROPOSITION TYPES ───────────────────────────────────
+
+type EqualSMM = (Int, Bool, Int)
+  # G1 and G2 have equal Spectral Markov Multisets
+
+type SMMIsMultisetOfColumns = (Int, Bool, Bool)
+  # SMM is a multiset-of-multisets of probability columns
+
+type ColumnsFromTimeEvolution = (Int, Bool, String)
+  # Probability columns derive from time evolution operators e^{-itH_j}
+
+type TimeEvoFromHj = (Int, Bool, Real)
+  # Time evolution is determined by probe Hamiltonian H_j
+
+type HjDeterminesCharPoly = (Int, String, Int)
+  # H_j determines its characteristic polynomial det(zI - H_j)
+
+type CharPolyHasCofactorExpansion = (Int, String, Bool)
+  # Characteristic polynomial expanded via adjugate: cofactors as multiset
+
+type EqualSMMImpliesEqualOuterMultisets = (Int, String, String)
+  # Equal SMM implies equal outer multisets of cofactor polynomials
+
+type OuterMultisetEqual = (Int, String, Real)
+  # Outer multisets of cofactor multisets are equal
+
+type OuterMultisetsArePolynomialMultisets = (Int, Real, Int)
+  # Outer multisets are multisets of polynomials in R[z,V,epsilon]
+
+type EqualPolynomialMultisets = (Int, Real, Bool)
+  # Two multisets of polynomials over R[z,V,epsilon] are equal
+
+type MultisetEqualityGivesBijection = (Int, Real, String)
+  # Equal multisets of distinct elements admit a combinatorial bijection
+
+type BijectionIsParameterIndependent = (Int, Real, Real)
+  # Bijection arises from polynomial identity, not pointwise equality
+
+type FixedBijectionSigma = (Bool, Int, Int)
+  # sigma is fixed across all (V, epsilon) parameter values
+
+type JacobiCofactorSum = (Bool, Int, Bool)
+  # Jacobi's formula: d/dz det(zI-H_j) = sum_f c_f(z;V,epsilon)
+
+type EqualCofactorSumsImplyEqualDerivatives = (Bool, Int, String)
+  # Equal cofactor multisets imply equal sums imply equal char poly derivatives
+
+type MonicDegreeNCharPolys = (Bool, Int, Real)
+  # Both characteristic polynomials are monic of degree N
+
+type IntegrateDerivativeToCoefficients = (Bool, Bool, Int)
+  # Monic degree N + equal derivatives implies coefficients agree for k >= 1
+
+type PerProbeAgreement = (Bool, Bool, Bool)
+  # For all probes and all k >= 1: char poly coefficients agree under sigma
+
+type RelabeledGraph = (Bool, Bool, String)
+  # G2 relabeled by sigma so probe matching is identity
+
+type CofactorInRelabeledBasis = (Bool, Bool, Real)
+  # Cofactor multiset expressed in sigma-relabeled basis
+
+type EpsilonAppearsOnlyInJJ = (Bool, String, Int)
+  # In cofactor multiset: epsilon appears only in entries involving |j,j>
+
+type CJJIsEpsilonIndependent = (Bool, String, Bool)
+  # c_{|j,j>} has degree 0 in epsilon (epsilon-independent)
+
+type OtherCofactorsHaveEpsilonDegreeOne = (Bool, String, String)
+  # All cofactors other than c_{|j,j>} have epsilon-degree exactly 1
+
+type UniqueEpsilonIndependentElement = (Bool, String, Real)
+  # c_{|j,j>} is the UNIQUE epsilon-independent element in the multiset
+
+type EqualMultisetsPreserveUniqueElement = (Bool, Real, Int)
+  # Equal multisets with a unique distinguished element must match it
+
+type LabeledCofactorEquality = (Bool, Real, Bool)
+  # For all v: c_{|v,v>}^{G1} = c_{|v,v>}^{G2'} (coincidence cofactors equal)
+
+
+# ═══════════════════════════════════════════════════════════
+# DECOMPOSITION OF extract_outer_multisets : EqualSMM -> OuterMultisetEqual
+# ═══════════════════════════════════════════════════════════
+#
+# SMM is a multiset-of-multisets of probability columns. Columns derive
+# from time evolution e^{-itH_j}, determined by H_j. H_j determines
+# det(zI - H_j). Cofactor multisets extracted from char poly via adjugate.
+# Equal SMM implies equal outer cofactor multisets.
+
+smm_is_multiset_of_columns : EqualSMM -> SMMIsMultisetOfColumns
+  cx    O(1) idem
+
+columns_from_time_evo : SMMIsMultisetOfColumns -> ColumnsFromTimeEvolution
+  cx    O(1) idem
+
+time_evo_from_hj : ColumnsFromTimeEvolution -> TimeEvoFromHj
+  cx    O(1) idem
+
+hj_determines_char_poly : TimeEvoFromHj -> HjDeterminesCharPoly
+  cx    O(1) idem
+
+char_poly_cofactor_expansion : HjDeterminesCharPoly -> CharPolyHasCofactorExpansion
+  cx    O(1) idem
+
+equal_smm_gives_equal_outer : (EqualSMM, CharPolyHasCofactorExpansion) -> EqualSMMImpliesEqualOuterMultisets
+  cx    O(1) idem
+
+witness_outer_multiset_equal : EqualSMMImpliesEqualOuterMultisets -> OuterMultisetEqual
+  cx    O(1) idem
+
+graph extract_outer_multisets : EqualSMM -> OuterMultisetEqual
+  flow  in -> smm_is_multiset_of_columns -> columns_from_time_evo -> time_evo_from_hj -> hj_determines_char_poly -> char_poly_cofactor_expansion
+  flow  (in, char_poly_cofactor_expansion) -> equal_smm_gives_equal_outer -> witness_outer_multiset_equal -> out
+
+
+# ═══════════════════════════════════════════════════════════
+# DECOMPOSITION OF construct_bijection_sigma : OuterMultisetEqual -> FixedBijectionSigma
+# ═══════════════════════════════════════════════════════════
+#
+# Outer multisets are multisets of polynomials in R[z,V,epsilon].
+# Equal multisets of polynomials admit a combinatorial bijection.
+# Bijection arises from polynomial identity (not pointwise).
+# Therefore sigma is fixed across all (V, epsilon).
+
+outer_multisets_are_polynomials : OuterMultisetEqual -> OuterMultisetsArePolynomialMultisets
+  cx    O(1) idem
+
+equal_polynomial_multisets : OuterMultisetsArePolynomialMultisets -> EqualPolynomialMultisets
+  cx    O(1) idem
+
+multiset_equality_gives_bijection : EqualPolynomialMultisets -> MultisetEqualityGivesBijection
+  cx    O(1) idem
+
+bijection_parameter_independent : MultisetEqualityGivesBijection -> BijectionIsParameterIndependent
+  cx    O(1) idem
+
+sigma_is_fixed : BijectionIsParameterIndependent -> FixedBijectionSigma
+  cx    O(1) idem
+
+graph construct_bijection_sigma : OuterMultisetEqual -> FixedBijectionSigma
+  flow  in -> outer_multisets_are_polynomials -> equal_polynomial_multisets -> multiset_equality_gives_bijection -> bijection_parameter_independent -> sigma_is_fixed -> out
+
+
+# ═══════════════════════════════════════════════════════════
+# DECOMPOSITION OF verify_coeff_agreement : (FixedBijectionSigma, OuterMultisetEqual) -> PerProbeAgreement
+# ═══════════════════════════════════════════════════════════
+#
+# Jacobi's formula: d/dz det(zI-H_j) = sum_f c_f(z;V,epsilon).
+# Equal cofactor multisets imply equal sums imply equal derivatives.
+# Both char polys monic degree N. Integrate: coefficients agree for k >= 1.
+
+apply_jacobi_formula : (FixedBijectionSigma, OuterMultisetEqual) -> JacobiCofactorSum
+  cx    O(1) idem
+
+equal_cofactor_sums : JacobiCofactorSum -> EqualCofactorSumsImplyEqualDerivatives
+  cx    O(1) idem
+
+both_monic_degree_n : (FixedBijectionSigma, OuterMultisetEqual) -> MonicDegreeNCharPolys
+  cx    O(1) idem
+
+integrate_to_coefficients : (EqualCofactorSumsImplyEqualDerivatives, MonicDegreeNCharPolys) -> IntegrateDerivativeToCoefficients
+  cx    O(1) idem
+
+witness_per_probe_agreement : IntegrateDerivativeToCoefficients -> PerProbeAgreement
+  cx    O(1) idem
+
+graph verify_coeff_agreement : (FixedBijectionSigma, OuterMultisetEqual) -> PerProbeAgreement
+  flow  in -> apply_jacobi_formula -> equal_cofactor_sums
+  flow  in -> both_monic_degree_n
+  flow  (equal_cofactor_sums, both_monic_degree_n) -> integrate_to_coefficients -> witness_per_probe_agreement -> out
+
+
+# ═══════════════════════════════════════════════════════════
+# DECOMPOSITION OF relabel_by_sigma : (PerProbeAgreement, FixedBijectionSigma) -> RelabeledGraph
+# ═══════════════════════════════════════════════════════════
+#
+# Apply sigma to G2 vertex labels so that probe matching becomes
+# the identity permutation. Express cofactors in the new basis.
+
+apply_sigma_to_g2 : (PerProbeAgreement, FixedBijectionSigma) -> RelabeledGraph
+  cx    O(1) idem
+
+express_cofactors_relabeled : RelabeledGraph -> CofactorInRelabeledBasis
+  cx    O(1) idem
+
+graph relabel_by_sigma : (PerProbeAgreement, FixedBijectionSigma) -> CofactorInRelabeledBasis
+  flow  in -> apply_sigma_to_g2 -> express_cofactors_relabeled -> out
+
+
+# ═══════════════════════════════════════════════════════════
+# DECOMPOSITION OF identify_epsilon_independent : CofactorInRelabeledBasis -> UniqueEpsilonIndependentElement
+# ═══════════════════════════════════════════════════════════
+#
+# In the cofactor multiset, epsilon appears only in entries involving |j,j>.
+# c_{|j,j>} has epsilon-degree 0 (rank-1 perturbation structure).
+# All other cofactors have epsilon-degree exactly 1.
+# Therefore c_{|j,j>} is the unique epsilon-independent element.
+
+epsilon_only_in_jj : CofactorInRelabeledBasis -> EpsilonAppearsOnlyInJJ
+  cx    O(1) idem
+
+cjj_epsilon_independent : EpsilonAppearsOnlyInJJ -> CJJIsEpsilonIndependent
+  cx    O(1) idem
+
+others_epsilon_degree_one : EpsilonAppearsOnlyInJJ -> OtherCofactorsHaveEpsilonDegreeOne
+  cx    O(1) idem
+
+cjj_is_unique : (CJJIsEpsilonIndependent, OtherCofactorsHaveEpsilonDegreeOne) -> UniqueEpsilonIndependentElement
+  cx    O(1) idem
+
+graph identify_epsilon_independent : CofactorInRelabeledBasis -> UniqueEpsilonIndependentElement
+  flow  in -> epsilon_only_in_jj
+  flow  epsilon_only_in_jj -> cjj_epsilon_independent
+  flow  epsilon_only_in_jj -> others_epsilon_degree_one
+  flow  (cjj_epsilon_independent, others_epsilon_degree_one) -> cjj_is_unique -> out
+
+
+# ═══════════════════════════════════════════════════════════
+# DECOMPOSITION OF match_coincidence_cofactors : UniqueEpsilonIndependentElement -> LabeledCofactorEquality
+# ═══════════════════════════════════════════════════════════
+#
+# Equal multisets with a unique distinguished element must match
+# that element. Applying this to each probe j gives coincidence
+# cofactor equality for all v in [n].
+
+equal_multisets_preserve_unique : UniqueEpsilonIndependentElement -> EqualMultisetsPreserveUniqueElement
+  cx    O(1) idem
+
+apply_to_all_probes : EqualMultisetsPreserveUniqueElement -> LabeledCofactorEquality
+  cx    O(1) idem
+
+graph match_coincidence_cofactors : UniqueEpsilonIndependentElement -> LabeledCofactorEquality
+  flow  in -> equal_multisets_preserve_unique -> apply_to_all_probes -> out

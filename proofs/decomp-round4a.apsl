@@ -1,0 +1,307 @@
+# decomp-round4a.apsl — Atomic decomposition of 3 compound proof nodes
+#
+# Each sub-node is exactly ONE logical primitive:
+#   definition unfolding, substitution of equals, quantifier instantiation,
+#   or modus ponens.
+#
+# Nodes decomposed:
+#   1. rellich_adjugate_eigenvector : EigenvalueList -> EigenvectorList
+#   2. newton_is_contraction        : Neighborhood -> NewtonMap
+#   3. establish_isospectrality      : EqualCharPolys -> EqualSpectra
+
+
+# ════════════════════════════════════════════════════════════
+# TYPES
+# ════════════════════════════════════════════════════════════
+
+type EigenvalueList = (Int, Int)
+type EigenvectorList = (Int, Int, Int)
+type Neighborhood = (Int, String)
+type NewtonMap = (Int, Bool)
+type EqualCharPolys = (String, Int)
+type EqualSpectra = (String, String)
+
+# --- rellich_adjugate_eigenvector intermediate types ---
+
+type EigenvectorDef = (Bool, Int)
+  # (lambda(t)I - A(t))psi = 0 is the definition of eigenvector
+
+type AdjugateDef = (Bool, String)
+  # adj(M) . M = det(M) . I by definition of adjugate
+
+type DetIsZero = (Bool, Bool)
+  # det(lambda(t)I - A(t)) = 0 because lambda(t) is eigenvalue
+
+type AdjugateTimesMatrixIsZero = (Int, Int, String)
+  # adj(lambda(t)I - A(t)) . (lambda(t)I - A(t)) = 0
+
+type NonzeroColumnIsEigenvector = (Int, Int, Bool)
+  # any nonzero column of adj(lambda(t)I - A(t)) lies in ker(lambda I - A)
+
+type SimpleImpliesRankDefOne = (Int, String, Int)
+  # simple eigenvalue implies rank(lambda I - A) = N-1
+
+type RankDefOneImpliesAdjRankOne = (Int, String, String)
+  # rank(lambda I - A) = N-1 implies adj(lambda I - A) has rank 1
+
+type NonzeroColumnExists = (Int, String, Bool)
+  # rank 1 matrix has at least one nonzero column
+
+type AdjugateEntriesAreCofactors = (Int, Bool, Int)
+  # entries of adj(M) are cofactors of M by definition
+
+type CofactorsArePolynomials = (Int, Bool, String)
+  # cofactors are polynomials in entries of M
+
+type PolynomialsInAnalyticAreAnalytic = (Int, Bool, Bool)
+  # polynomials in analytic functions are analytic (composition)
+
+type EigenvectorIsAnalytic = (String, Int, Int)
+  # therefore psi(t) is analytic
+
+# --- newton_is_contraction intermediate types ---
+
+type RootAtZero = (String, Int, String)
+  # F(lambda_0, 0) = 0 (premise)
+
+type NonzeroDeriv = (String, Int, Bool)
+  # F_lambda(lambda_0, 0) != 0 (premise)
+
+type ContinuityOfFLambda = (String, String, Int)
+  # F_lambda is continuous (analytic implies continuous)
+
+type NeighborhoodBoundedBelow = (String, String, String)
+  # exists neighborhood U where |F_lambda| > c > 0
+
+type NewtonStepDef = (String, String, Bool)
+  # g(lambda) = lambda - F(lambda,t)/F_lambda(lambda,t) by definition
+
+type NewtonDerivByQuotientRule = (String, Bool, Int)
+  # g'(lambda) = F(lambda,t) . F_lambdalambda(lambda,t) / [F_lambda(lambda,t)]^2
+
+type AtRootFIsZero = (String, Bool, String)
+  # F(lambda_star, t) = 0 at the root lambda_star
+
+type DerivAtRootIsZero = (String, Bool, Bool)
+  # g'(lambda_star) = 0 because F(lambda_star, t) = 0
+
+type DerivContinuous = (Bool, Int, Int)
+  # g' is continuous (quotient of analytic functions away from zeros of denominator)
+
+type NeighborhoodDerivSmall = (Bool, Int, String)
+  # exists neighborhood V where |g'| < 1
+
+type MeanValueContraction = (Bool, Int, Bool)
+  # |g'| < 1 on V implies g is contraction on V (mean value theorem)
+
+# --- establish_isospectrality intermediate types ---
+
+type CharPolyDef = (Bool, String, Int)
+  # p_A(lambda) = det(lambda I - A) by definition
+
+type FactoredFormDef = (Bool, String, String)
+  # p_A(lambda) = product(lambda - lambda_i) by FTA factored form
+
+type EqualAsPolynomials = (Bool, String, Bool)
+  # p_A = p_B as polynomials (hypothesis)
+
+type EqualPolysHaveEqualRoots = (Bool, Bool, Int)
+  # equal polynomials have identical root multisets (FTA uniqueness)
+
+type SpectraAreRootMultisets = (Bool, Bool, String)
+  # spec(A) = roots of p_A as multiset, by definition
+
+type SpectraEqual = (Bool, Bool, Bool)
+  # therefore spec(A) = spec(B) as multisets
+
+
+# ════════════════════════════════════════════════════════════
+# NODE 1: rellich_adjugate_eigenvector
+# EigenvalueList -> EigenvectorList
+#
+# Given analytic eigenvalue lambda(t), construct eigenvector psi(t)
+# via Cramer's rule (adjugate method). Prove psi(t) is analytic.
+# ════════════════════════════════════════════════════════════
+
+# Step 1: Definition unfolding — eigenvector means (lambda I - A)psi = 0
+unfold_eigenvector_def : EigenvalueList -> EigenvectorDef
+  cx    O(1) idem
+
+# Step 2: Definition unfolding — adj(M).M = det(M).I
+unfold_adjugate_def : EigenvectorDef -> AdjugateDef
+  cx    O(1) idem
+
+# Step 3: Definition unfolding — lambda(t) is eigenvalue means det(lambda I - A) = 0
+unfold_eigenvalue_means_det_zero : EigenvalueList -> DetIsZero
+  cx    O(1) idem
+
+# Step 4: Substitution — replace det(lambda I - A) with 0 in adj.M = det.I
+substitute_det_zero : (AdjugateDef, DetIsZero) -> AdjugateTimesMatrixIsZero
+  cx    O(1) idem
+
+# Step 5: Modus ponens — adj.(lambda I - A) = 0 means columns of adj are in ker(lambda I - A)
+columns_in_kernel : AdjugateTimesMatrixIsZero -> NonzeroColumnIsEigenvector
+  cx    O(1) idem
+
+# Step 6: Definition unfolding — simple eigenvalue means multiplicity 1
+unfold_simple_eigenvalue : EigenvalueList -> SimpleImpliesRankDefOne
+  cx    O(1) idem
+
+# Step 7: Modus ponens — simple eigenvalue implies rank(lambda I - A) = N-1,
+#         so rank-nullity gives adj rank 1
+rank_deficiency_to_adj_rank : SimpleImpliesRankDefOne -> RankDefOneImpliesAdjRankOne
+  cx    O(1) idem
+
+# Step 8: Modus ponens — rank 1 matrix has nonzero column
+adj_rank_one_has_nonzero_col : RankDefOneImpliesAdjRankOne -> NonzeroColumnExists
+  cx    O(1) idem
+
+# Step 9: Modus ponens — nonzero column exists and columns are eigenvectors,
+#         so eigenvector exists
+eigenvector_exists : (NonzeroColumnIsEigenvector, NonzeroColumnExists) -> EigenvectorDef
+  cx    O(1) idem
+
+# Step 10: Definition unfolding — adjugate entries are cofactors
+unfold_adj_entries_are_cofactors : NonzeroColumnExists -> AdjugateEntriesAreCofactors
+  cx    O(1) idem
+
+# Step 11: Definition unfolding — cofactors are (N-1)x(N-1) determinants,
+#          i.e. polynomials in entries of the matrix
+unfold_cofactors_are_polynomials : AdjugateEntriesAreCofactors -> CofactorsArePolynomials
+  cx    O(1) idem
+
+# Step 12: Modus ponens — polynomials of analytic functions are analytic
+#          (analytic functions closed under polynomial operations)
+analytic_composition : (CofactorsArePolynomials, EigenvalueList) -> PolynomialsInAnalyticAreAnalytic
+  cx    O(1) idem
+
+# Step 13: Modus ponens — eigenvector is a column of adj, adj entries are analytic,
+#          therefore eigenvector is analytic
+eigenvector_analytic : (EigenvectorDef, PolynomialsInAnalyticAreAnalytic) -> EigenvectorIsAnalytic
+  cx    O(1) idem
+
+# Step 14: Substitution — pack analytic eigenvector into output list
+pack_eigenvector_list : EigenvectorIsAnalytic -> EigenvectorList
+  cx    O(1) idem
+
+graph rellich_adjugate_eigenvector : EigenvalueList -> EigenvectorList
+  flow  in -> unfold_eigenvector_def -> unfold_adjugate_def
+  flow  in -> unfold_eigenvalue_means_det_zero
+  flow  (unfold_adjugate_def, unfold_eigenvalue_means_det_zero) -> substitute_det_zero -> columns_in_kernel
+  flow  in -> unfold_simple_eigenvalue -> rank_deficiency_to_adj_rank -> adj_rank_one_has_nonzero_col
+  flow  (columns_in_kernel, adj_rank_one_has_nonzero_col) -> eigenvector_exists
+  flow  adj_rank_one_has_nonzero_col -> unfold_adj_entries_are_cofactors -> unfold_cofactors_are_polynomials
+  flow  (unfold_cofactors_are_polynomials, in) -> analytic_composition
+  flow  (eigenvector_exists, analytic_composition) -> eigenvector_analytic -> pack_eigenvector_list -> out
+
+
+# ════════════════════════════════════════════════════════════
+# NODE 2: newton_is_contraction
+# Neighborhood -> NewtonMap
+#
+# Newton's method g(lambda) = lambda - F/F_lambda is a contraction
+# near the root. Prove |g'| < 1 in a neighborhood.
+# ════════════════════════════════════════════════════════════
+
+# Step 1: Definition unfolding — F(lambda_0, 0) = 0 is the root premise
+unfold_root_premise : Neighborhood -> RootAtZero
+  cx    O(1) idem
+
+# Step 2: Definition unfolding — F_lambda(lambda_0, 0) != 0 is the nondegeneracy premise
+unfold_nondegen_premise : Neighborhood -> NonzeroDeriv
+  cx    O(1) idem
+
+# Step 3: Modus ponens — analytic implies continuous, so F_lambda is continuous
+analytic_implies_continuous : NonzeroDeriv -> ContinuityOfFLambda
+  cx    O(1) idem
+
+# Step 4: Modus ponens — continuous function nonzero at a point implies
+#         bounded away from zero in a neighborhood
+continuous_nonzero_neighborhood : (ContinuityOfFLambda, NonzeroDeriv) -> NeighborhoodBoundedBelow
+  cx    O(1) idem
+
+# Step 5: Definition unfolding — Newton step g(lambda) = lambda - F/F_lambda
+unfold_newton_step : NeighborhoodBoundedBelow -> NewtonStepDef
+  cx    O(1) idem
+
+# Step 6: Substitution — differentiate g by quotient rule: g' = F . F_ll / [F_l]^2
+differentiate_newton_step : NewtonStepDef -> NewtonDerivByQuotientRule
+  cx    O(1) idem
+
+# Step 7: Definition unfolding — at root lambda_star: F(lambda_star, t) = 0
+unfold_root_condition : RootAtZero -> AtRootFIsZero
+  cx    O(1) idem
+
+# Step 8: Substitution — substitute F = 0 into g' formula: g'(lambda_star) = 0
+substitute_f_zero_in_deriv : (NewtonDerivByQuotientRule, AtRootFIsZero) -> DerivAtRootIsZero
+  cx    O(1) idem
+
+# Step 9: Modus ponens — g' is a quotient of analytic functions,
+#         analytic implies continuous on the neighborhood
+gprime_is_continuous : (NewtonDerivByQuotientRule, NeighborhoodBoundedBelow) -> DerivContinuous
+  cx    O(1) idem
+
+# Step 10: Modus ponens — continuous function equal to 0 at a point implies
+#          |g'| < 1 in some neighborhood V
+continuous_zero_implies_small : (DerivContinuous, DerivAtRootIsZero) -> NeighborhoodDerivSmall
+  cx    O(1) idem
+
+# Step 11: Modus ponens — |g'| < 1 on V implies g is contraction (mean value theorem)
+mean_value_contraction : NeighborhoodDerivSmall -> MeanValueContraction
+  cx    O(1) idem
+
+# Step 12: Substitution — contraction on V is the NewtonMap with contraction witness
+pack_contraction_result : MeanValueContraction -> NewtonMap
+  cx    O(1) idem
+
+graph newton_is_contraction : Neighborhood -> NewtonMap
+  flow  in -> unfold_root_premise -> unfold_root_condition
+  flow  in -> unfold_nondegen_premise -> analytic_implies_continuous
+  flow  (analytic_implies_continuous, unfold_nondegen_premise) -> continuous_nonzero_neighborhood -> unfold_newton_step -> differentiate_newton_step
+  flow  (differentiate_newton_step, unfold_root_condition) -> substitute_f_zero_in_deriv
+  flow  (differentiate_newton_step, continuous_nonzero_neighborhood) -> gprime_is_continuous
+  flow  (gprime_is_continuous, substitute_f_zero_in_deriv) -> continuous_zero_implies_small -> mean_value_contraction -> pack_contraction_result -> out
+
+
+# ════════════════════════════════════════════════════════════
+# NODE 3: establish_isospectrality
+# EqualCharPolys -> EqualSpectra
+#
+# Equal characteristic polynomials imply equal eigenvalues
+# with equal multiplicities.
+# ════════════════════════════════════════════════════════════
+
+# Step 1: Definition unfolding — p_A(lambda) = det(lambda I - A)
+unfold_char_poly_def : EqualCharPolys -> CharPolyDef
+  cx    O(1) idem
+
+# Step 2: Definition unfolding — by FTA, p_A(lambda) = product(lambda - lambda_i)
+unfold_factored_form : CharPolyDef -> FactoredFormDef
+  cx    O(1) idem
+
+# Step 3: Definition unfolding — the hypothesis: p_A = p_B as polynomials
+unfold_equality_hypothesis : EqualCharPolys -> EqualAsPolynomials
+  cx    O(1) idem
+
+# Step 4: Modus ponens — equal polynomials have equal roots with equal multiplicities
+#         (FTA: factorization over C is unique up to ordering)
+equal_polys_equal_roots : (EqualAsPolynomials, FactoredFormDef) -> EqualPolysHaveEqualRoots
+  cx    O(1) idem
+
+# Step 5: Definition unfolding — spectrum of A is the root multiset of p_A
+unfold_spectrum_def : EqualPolysHaveEqualRoots -> SpectraAreRootMultisets
+  cx    O(1) idem
+
+# Step 6: Substitution — substitute equal root multisets into spectrum definition
+substitute_equal_roots : (SpectraAreRootMultisets, EqualPolysHaveEqualRoots) -> SpectraEqual
+  cx    O(1) idem
+
+# Step 7: Substitution — repackage as EqualSpectra
+pack_equal_spectra : SpectraEqual -> EqualSpectra
+  cx    O(1) idem
+
+graph establish_isospectrality : EqualCharPolys -> EqualSpectra
+  flow  in -> unfold_char_poly_def -> unfold_factored_form
+  flow  in -> unfold_equality_hypothesis
+  flow  (unfold_equality_hypothesis, unfold_factored_form) -> equal_polys_equal_roots -> unfold_spectrum_def
+  flow  (unfold_spectrum_def, equal_polys_equal_roots) -> substitute_equal_roots -> pack_equal_spectra -> out

@@ -1,0 +1,7 @@
+[package]
+name = "apsl-smt"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+apsl-core.workspace = true
