@@ -273,7 +273,7 @@ impl fmt::Display for UnifyError {
     }
 }
 
-pub fn parse_signature_string(_s: &str) -> Option<Scheme> { None } // intentionally unused; env builds directly
+pub fn parse_signature_string(_s: &str) -> Option<Scheme> { None }
 
 pub type Env = BTreeMap<String, Scheme>;
 

@@ -778,7 +778,7 @@ impl Parser {
             if s == "implies" {
                 let sp = self.span();
                 self.bump();
-                let r = self.parse_implies_expr()?; // right-assoc
+                let r = self.parse_implies_expr()?;
                 let not_left = Expr::Un(UnOp::Not, Box::new(left), sp.clone());
                 return Ok(Expr::Bin(BinOp::Or, Box::new(not_left), Box::new(r), sp));
             }

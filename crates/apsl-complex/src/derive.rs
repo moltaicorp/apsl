@@ -125,7 +125,7 @@ fn apply_cost(name: &Ident, args: &[Expr], size_for: &BTreeMap<Ident, Ident>) ->
                 None => CxExpr::Const,
             }
         }
-        _ => CxExpr::Const,  // unknown / user-defined: charge no intrinsic
+        _ => CxExpr::Const, 
     };
     match (arg_cost, intrinsic) {
         (CxExpr::Const, CxExpr::Const) => CxExpr::Const,

@@ -42,7 +42,7 @@ fn scalar_is_str(value: &str, style: TScalarStyle, tag: &Option<Tag>) -> bool {
     }
     match style {
         TScalarStyle::Plain => !nonstr().is_match(value),
-        _ => true, // single/double-quoted, literal, folded → always a string
+        _ => true,
     }
 }
 
@@ -65,8 +65,8 @@ fn walk(node: &Rc<YNode>, path: &str, out: &mut Vec<Violation>) {
         }
         YNode::Map(pairs) => {
             for (k, v) in pairs {
-                walk(k, path, out); // keys: state too
-                walk(v, path, out); // values: state
+                walk(k, path, out);
+                walk(v, path, out);
             }
         }
         YNode::Seq(items) => {

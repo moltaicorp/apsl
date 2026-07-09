@@ -200,6 +200,21 @@ fn check_graph(
         }
     }
 
+    let mut node_outputs: std::collections::HashMap<String, Ty> = std::collections::HashMap::new();
+    for chain in &g.flow {
+        for step in chain {
+            if step.nodes.len() == 1 {
+                let name = step.nodes[0].as_str();
+                if name == "in" || name == "out" { continue; }
+                if let Some(scheme) = env.get(name).cloned() {
+                    if let Ty::Fun(_, ret) = instantiate(&scheme, &mut gen) {
+                        node_outputs.insert(name.to_string(), *ret);
+                    }
+                }
+            }
+        }
+    }
+
     for chain in &g.flow {
         if chain.is_empty() { continue; }
         let mut cur: Option<Ty> = None;
@@ -247,6 +262,10 @@ fn check_graph(
                     let nm = n.as_str();
                     if nm == "in" { outs.push(in_ty.clone()); continue; }
                     if nm == "out" { outs.push(out_ty.clone()); continue; }
+                    if let Some(ty) = node_outputs.get(nm).cloned() {
+                        outs.push(ty);
+                        continue;
+                    }
                     match env.get(nm).cloned() {
                         Some(scheme) => match instantiate(&scheme, &mut gen) {
                             Ty::Fun(_, ret) => outs.push(*ret),
@@ -270,7 +289,8 @@ fn check_graph(
                     }
                 }
                 if !ok { cur = None; continue; }
-                (None, Some(Ty::Tuple(outs)))
+                let flattened = flatten_world_tuple(&outs);
+                (None, Some(flattened))
             };
             if let (Some(c), Some(expected)) = (&cur, &expected_input) {
                 if unify(&subst.apply(c), &subst.apply(expected)).is_err() {
@@ -681,4 +701,29 @@ mod tests {
         let errs = type_check(&p).unwrap_err();
         assert!(errs.iter().any(|e| matches!(e.kind, TypeErrorKind::UnknownName(_))));
     }
+}
+
+fn flatten_world_tuple(outs: &[Ty]) -> Ty {
+    let mut flat: Vec<Ty> = Vec::new();
+    for t in outs {
+        match t {
+            Ty::Tuple(inner) if !inner.is_empty() => {
+                for (i, e) in inner.iter().enumerate() {
+                    if i == 0 && is_world_type(e) {
+                        if !flat.iter().any(|x| is_world_type(x)) {
+                            flat.push(e.clone());
+                        }
+                    } else {
+                        flat.push(e.clone());
+                    }
+                }
+            }
+            _ => flat.push(t.clone()),
+        }
+    }
+    if flat.len() == 1 { flat.remove(0) } else { Ty::Tuple(flat) }
+}
+
+fn is_world_type(t: &Ty) -> bool {
+    matches!(t, Ty::Base(n) if n == "World") || matches!(t, Ty::Parameterized(n, _) if n == "World")
 }

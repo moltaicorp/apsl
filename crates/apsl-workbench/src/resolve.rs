@@ -250,7 +250,7 @@ mod tests {
     #[test]
     fn similar_but_unverified_is_rejected() {
         let index = InMemoryIndex::new();
-        let requested = stored_like(); // expects y∈[0,2] for x∈[0,1]
+        let requested = stored_like();
         index.seed(stored_like(), "/nix/store/ccc-bad");
 
         let eval = |_c: &Candidate| -> Box<ImplFn<'static>> { Box::new(|x: &[f64]| vec![10.0 * x[0]]) };

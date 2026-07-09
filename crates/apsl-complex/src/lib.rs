@@ -108,7 +108,7 @@ fn simplify(e: &CxExpr) -> CxExpr {
             for x in xs {
                 match simplify(x) {
                     Sum(inner) => flat.extend(inner),
-                    Const => {}  // drop constants from a sum unless they're alone
+                    Const => {} 
                     other => flat.push(other),
                 }
             }
@@ -125,7 +125,7 @@ fn simplify(e: &CxExpr) -> CxExpr {
             for x in xs {
                 match simplify(x) {
                     Prod(inner) => flat.extend(inner),
-                    Const => {} // 1 * x = x
+                    Const => {}
                     other => flat.push(other),
                 }
             }

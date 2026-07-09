@@ -58,7 +58,7 @@ fn combine_mul(a: Weight, b: Weight) -> Weight {
     use Weight::*;
     match (a, b) {
         (Const, x) | (x, Const) => x,
-        (LogN, LogN) => LogN,  // log * log ≈ log^2, still ≤ n log n on its own; we approximate
+        (LogN, LogN) => LogN, 
         (LogN, Size) | (Size, LogN) => NLogN,
         (LogN, NLogN) | (NLogN, LogN) => Polynomial,
         (Size, Size) => Polynomial,

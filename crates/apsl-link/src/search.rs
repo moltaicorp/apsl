@@ -198,7 +198,7 @@ mod tests {
         assert!(matches_definition("type Email = String", "Email"));
         assert!(matches_definition("type Email=String", "Email"));
         assert!(!matches_definition("type EmailAddr = String", "Email"));
-        assert!(!matches_definition("  type Email = String", "Email")); // indented
+        assert!(!matches_definition("  type Email = String", "Email"));
     }
 
     #[test]

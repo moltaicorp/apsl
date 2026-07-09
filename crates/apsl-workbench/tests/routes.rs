@@ -6,7 +6,7 @@ use axum::http::{Request, StatusCode};
 use ed25519_dalek::SigningKey;
 use rand_core::OsRng;
 use serde_json::Value;
-use tower::ServiceExt; // oneshot
+use tower::ServiceExt;
 
 #[path = "../src/pipeline.rs"]
 mod pipeline;

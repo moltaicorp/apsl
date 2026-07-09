@@ -28,8 +28,8 @@ impl Span {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Type {
     Base(Ident),
-    /// `World<S>` or other parameterized type: base name + type args.
-    /// Used for World<S> where S is the RootState identity.
+   
+   
     Parameterized(Ident, Vec<Type>),
     Record(Vec<(Ident, Box<Type>)>),
     List(Box<Type>),

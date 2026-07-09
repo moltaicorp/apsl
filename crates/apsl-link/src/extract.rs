@@ -25,7 +25,7 @@ pub fn locally_defined(p: &Program) -> BTreeSet<String> {
 
 pub fn unresolved_symbols(p: &Program, local: &BTreeSet<String>) -> BTreeSet<String> {
     let mut referenced = BTreeSet::new();
-    let bound = BTreeSet::new(); // top-level: no bound variables
+    let bound = BTreeSet::new();
     for d in &p.decls {
         match d {
             Decl::Type(ta) => {

@@ -607,7 +607,7 @@ fn check_rooted(prog: &apsl_core::Program) -> Vec<String> {
     let mut errors = Vec::new();
     use apsl_core::ast::Type;
 
-    // 1. Reject any node that uses bare `World` (Type::Base("World")) without type parameter
+   
     fn type_has_bare_world(ty: &Type) -> bool {
         match ty {
             Type::Base(id) => id.as_str() == "World",
@@ -658,7 +658,7 @@ fn check_rooted(prog: &apsl_core::Program) -> Vec<String> {
         }
     }
 
-    // 2. Check the file's nodes form one weakly-connected DAG with a single entry root
+   
     let mut node_names: HashSet<String> = HashSet::new();
     let mut edges: HashMap<String, HashSet<String>> = HashMap::new();
     let mut all_nodes: HashSet<String> = HashSet::new();
@@ -691,7 +691,7 @@ fn check_rooted(prog: &apsl_core::Program) -> Vec<String> {
         }
     }
 
-    // Weakly-connected components (treat edges as undirected)
+   
     let mut visited: HashSet<String> = HashSet::new();
     let mut components: Vec<Vec<String>> = Vec::new();
     let mut undirected: HashMap<String, HashSet<String>> = HashMap::new();

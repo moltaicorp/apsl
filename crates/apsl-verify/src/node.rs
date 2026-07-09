@@ -112,7 +112,7 @@ mod tests {
         let v = verify_numeric_node_p(
             &pi,
             &vec![(0.0, 1.0)],
-            &vec![(0.0, 1.0e9)], // wide post: isolate the FOLD signal, not a violation
+            &vec![(0.0, 1.0e9)],
             Params { grid: 11, ..Params::default() },
         );
         assert!(!v.folds.is_empty(), "expected fold near 0.5: {v:?}");

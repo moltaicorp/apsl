@@ -68,7 +68,7 @@ fn max_singular_value(j: &[f64], m: usize, n: usize) -> f64 {
         let norm = av.iter().map(|x| x * x).sum::<f64>().sqrt();
         if norm < 1e-300 { return 0.0; }
         for i in 0..n { v[i] = av[i] / norm; }
-        lambda = norm; // Rayleigh-ish: ||A v|| with unit v → dominant eigenvalue
+        lambda = norm;
     }
     lambda.max(0.0).sqrt()
 }

@@ -253,7 +253,7 @@ mod tests {
         let (sk, vk) = new_keypair();
         let tcb = TcbManifest::default();
         let mut c = emit(&trivial_node(), None, "ok", "O(1)", vec![], tcb.clone(), &sk);
-        c.cx_derived = "O(n^2)".into();  // tamper after signing
+        c.cx_derived = "O(n^2)".into(); 
         let r = verify(&c, &vk, &tcb);
         assert!(matches!(r, Err(VerifyError::SignatureInvalid)));
     }

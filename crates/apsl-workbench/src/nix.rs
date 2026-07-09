@@ -62,7 +62,7 @@ pub fn gen_flake(nodes: &[String]) -> String {
 {cps}
         printf '{{{manifest_entries}}}' > $out/manifest.json
       '';
-    in {{ packages.${{system}} = nodes // {{ inherit app; }}; }};
+    in {{ packages.${{system}} = nodes
 }}"#
     )
 }

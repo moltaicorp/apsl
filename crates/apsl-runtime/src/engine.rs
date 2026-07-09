@@ -144,7 +144,7 @@ impl Runtime {
                 duration_ms,
                 completed_at,
                 proof_hash: Proof::compute_hash(node_name, &input_hash, &output_hash, completed_at),
-                postconditions_verified: true, // TODO: evaluate post predicates
+                postconditions_verified: true,
             };
 
             tracing::info!(

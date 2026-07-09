@@ -123,7 +123,7 @@ pub fn scan(path: &str, text: &str, out: &mut Vec<Violation>, faults: &mut Vec<F
                         cx.flag(line_of(&line_starts, data_start), data.trim(), &data, out);
                     }
                 }
-                Some("style") => {} // CSS — out of scope
+                Some("style") => {}
                 _ => {
                     let data = unescape(&text[data_start..i]);
                     if !data.trim().is_empty() {

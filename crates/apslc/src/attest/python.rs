@@ -356,7 +356,7 @@ impl<'a> Cx<'a> {
 
 #[allow(unused_assignments)]
 pub fn scan(path: &str, text: &str, out: &mut Vec<Violation>, faults: &mut Vec<Fault>) {
-    let _ = faults; // committed Python parses; a SyntaxError-fault is not modeled.
+    let _ = faults;
     let b = text.as_bytes();
     let n = b.len();
     let mut line_starts: Vec<usize> = vec![0];
@@ -381,7 +381,7 @@ pub fn scan(path: &str, text: &str, out: &mut Vec<Violation>, faults: &mut Vec<F
     let mut name_count = 0usize;
     let mut token_seen = false;
     let mut line_toks: Vec<Folded> = Vec::new();
-    let mut doc_eligible = true; // module start
+    let mut doc_eligible = true;
 
     macro_rules! close_line {
         () => {{
