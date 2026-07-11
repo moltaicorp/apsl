@@ -1,5 +1,9 @@
 # APSL — Abstract Protocol Schema Language
 
+<p align="center">
+  <img src="assets/apsl-banner.png" alt="APSL — the file is the machine" width="720">
+</p>
+
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust 2021](https://img.shields.io/badge/Rust-2021-orange.svg)](https://www.rust-lang.org/)
 [![Crates: 14](https://img.shields.io/badge/crates-14-green.svg)](#workspace)
