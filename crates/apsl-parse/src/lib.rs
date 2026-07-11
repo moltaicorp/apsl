@@ -1,4 +1,3 @@
-
 #![forbid(unsafe_code)]
 
 pub mod lex;
@@ -8,7 +7,10 @@ pub use lex::{lex, LexError, Tok, TokKind};
 pub use parse::{parse_tokens, ParseError};
 
 pub fn parse_str(src: &str) -> Result<apsl_core::Program, ParseError> {
-    let toks = lex(src).map_err(|e| ParseError { msg: e.msg, span: e.span })?;
+    let toks = lex(src).map_err(|e| ParseError {
+        msg: e.msg,
+        span: e.span,
+    })?;
     parse_tokens(toks)
 }
 
@@ -37,7 +39,8 @@ mod tests {
 
     #[test]
     fn node_with_quantifier_alias() {
-        let src = "n : String[] -> Bool\n  post  forall x in in. valid_email?(x)\n  cx    O(n) idem\n";
+        let src =
+            "n : String[] -> Bool\n  post  forall x in in. valid_email?(x)\n  cx    O(n) idem\n";
         let _p = parse_str(src).unwrap();
     }
 
@@ -67,7 +70,9 @@ mod tests {
         if let apsl_core::ast::Decl::Node(n) = &p.decls[0] {
             let sla = n.sla.as_ref().unwrap();
             assert_eq!(sla.delta, (1, 1_000_000_000));
-        } else { panic!("expected node"); }
+        } else {
+            panic!("expected node");
+        }
     }
 
     #[test]
@@ -77,16 +82,21 @@ mod tests {
         if let apsl_core::ast::Decl::Node(n) = &p.decls[0] {
             let sla = n.sla.as_ref().unwrap();
             assert_eq!(sla.delta, (1, 1_000_000_000));
-        } else { panic!("expected node"); }
+        } else {
+            panic!("expected node");
+        }
     }
 
     #[test]
     fn multi_line_flow_accumulates() {
-        let src = "graph g : Int -> Int\n  flow in -> a -> c\n  flow in -> b -> c\n  flow c -> out\n";
+        let src =
+            "graph g : Int -> Int\n  flow in -> a -> c\n  flow in -> b -> c\n  flow c -> out\n";
         let p = parse_str(src).unwrap();
         if let apsl_core::ast::Decl::Graph(g) = &p.decls[0] {
             assert_eq!(g.flow.len(), 3);
-        } else { panic!("expected graph"); }
+        } else {
+            panic!("expected graph");
+        }
     }
 
     #[test]
@@ -102,7 +112,9 @@ mod tests {
             assert_eq!(chain[0].nodes[1].as_str(), "b");
             assert_eq!(chain[1].nodes.len(), 1);
             assert_eq!(chain[1].nodes[0].as_str(), "c");
-        } else { panic!("expected graph"); }
+        } else {
+            panic!("expected graph");
+        }
     }
 
     #[test]
@@ -120,7 +132,9 @@ mod tests {
             assert_eq!(v.tag.as_str(), "statistical");
             assert_eq!(v.attrs[0].0.as_str(), "holdout");
             assert_eq!(v.attrs[0].1.as_str(), "intents_v3");
-        } else { panic!("expected node"); }
+        } else {
+            panic!("expected node");
+        }
     }
 
     #[test]
@@ -129,7 +143,8 @@ mod tests {
         let err = parse_str(src).unwrap_err();
         assert!(
             err.msg.contains("requires attribute `holdout"),
-            "actual error: {}", err.msg,
+            "actual error: {}",
+            err.msg,
         );
     }
 
@@ -148,7 +163,9 @@ mod tests {
             assert_eq!(n.state.len(), 1);
             assert_eq!(n.state[0].key.as_str(), "origin");
             assert!(n.state[0].default.is_none());
-        } else { panic!("expected node"); }
+        } else {
+            panic!("expected node");
+        }
     }
 
     #[test]
@@ -162,7 +179,9 @@ mod tests {
                 Some(apsl_core::ast::Lit::Int(v)) => assert_eq!(*v, 86400),
                 other => panic!("expected Int(86400), got {:?}", other),
             }
-        } else { panic!("expected node"); }
+        } else {
+            panic!("expected node");
+        }
     }
 
     #[test]
@@ -173,7 +192,9 @@ mod tests {
             assert_eq!(n.state.len(), 2);
             assert_eq!(n.state[0].key.as_str(), "a");
             assert_eq!(n.state[1].key.as_str(), "b");
-        } else { panic!("expected node"); }
+        } else {
+            panic!("expected node");
+        }
     }
 
     #[test]
@@ -186,7 +207,9 @@ mod tests {
                 Some(apsl_core::ast::Lit::Str(s)) => assert_eq!(s, "https://vault.example.com"),
                 other => panic!("expected Str, got {:?}", other),
             }
-        } else { panic!("expected node"); }
+        } else {
+            panic!("expected node");
+        }
     }
 
     #[test]
@@ -195,6 +218,8 @@ mod tests {
         let p = parse_str(src).unwrap();
         if let apsl_core::ast::Decl::Node(n) = &p.decls[0] {
             assert!(n.state.is_empty());
-        } else { panic!("expected node"); }
+        } else {
+            panic!("expected node");
+        }
     }
 }

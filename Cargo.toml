@@ -15,6 +15,7 @@ members = [
     "crates/apsl",
     "crates/apsl-verify",
     "crates/apsl-workbench",
+    "crates/apsl-artifact",
 ]
 
 [workspace.package]
@@ -32,6 +33,7 @@ apsl-complex = { path = "crates/apsl-complex" }
 apsl-smt = { path = "crates/apsl-smt" }
 apsl-cert = { path = "crates/apsl-cert" }
 apsl-link = { path = "crates/apsl-link" }
+apsl-artifact = { path = "crates/apsl-artifact" }
 
 sha2 = "0.10"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }

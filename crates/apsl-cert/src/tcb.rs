@@ -1,4 +1,3 @@
-
 use apsl_core::canon::{write_str, ArrayWriter, Canon, ObjectWriter};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -25,8 +24,14 @@ impl Canon for TcbManifest {
 }
 
 impl TcbManifest {
-    pub fn add(&mut self, name: impl Into<String>, hash: impl Into<String>, version: impl Into<String>) {
-        self.components.push((name.into(), hash.into(), version.into()));
+    pub fn add(
+        &mut self,
+        name: impl Into<String>,
+        hash: impl Into<String>,
+        version: impl Into<String>,
+    ) {
+        self.components
+            .push((name.into(), hash.into(), version.into()));
     }
 }
 

@@ -12,12 +12,7 @@ apsl-core.workspace = true
 apsl-parse.workspace = true
 apsl-types.workspace = true
 apsl-link.workspace = true
+apsl-artifact.workspace = true
 
-# `check --attest` (the no-strings LAW executor) parser backends: regex for the
-# pattern families (wrapper-content, Rust char/lifetime, the PyYAML implicit
-# resolver), yaml-rust2 for the YAML event stream (style + anchor sharing),
-# toml/serde_json for loud validation of those two data formats.
-regex = "1"
-yaml-rust2 = "0.11"
-toml = "1"
+[dev-dependencies]
 serde_json.workspace = true

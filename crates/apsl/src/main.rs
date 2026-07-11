@@ -1,4 +1,3 @@
-
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -52,21 +51,21 @@ enum Cmd {
 }
 
 fn load_program(path: &PathBuf) -> Result<Program> {
-    let src = std::fs::read_to_string(path)
-        .with_context(|| format!("cannot read {}", path.display()))?;
+    let src =
+        std::fs::read_to_string(path).with_context(|| format!("cannot read {}", path.display()))?;
     let prog = parse_str(&src)
         .map_err(|e| anyhow::anyhow!("parse error at {}:{}: {}", e.span.line, e.span.col, e.msg))?;
 
     let linked = apsl_link::link(&prog, path.as_ref(), &[])
         .map_err(|e| anyhow::anyhow!("link error: {e}"))?;
 
-    apsl_types::type_check(&linked.program)
-        .map_err(|errs| {
-            let msgs: Vec<String> = errs.iter()
-                .map(|e| format!("  {}:{}: {}", e.span.line, e.span.col, e.msg))
-                .collect();
-            anyhow::anyhow!("type errors:\n{}", msgs.join("\n"))
-        })?;
+    apsl_types::type_check(&linked.program).map_err(|errs| {
+        let msgs: Vec<String> = errs
+            .iter()
+            .map(|e| format!("  {}:{}: {}", e.span.line, e.span.col, e.msg))
+            .collect();
+        anyhow::anyhow!("type errors:\n{}", msgs.join("\n"))
+    })?;
 
     Ok(linked.program)
 }
@@ -80,7 +79,14 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Cmd::Run { spec, graph, target, gate, nodes_dir, vault_bin } => {
+        Cmd::Run {
+            spec,
+            graph,
+            target,
+            gate,
+            nodes_dir,
+            vault_bin,
+        } => {
             eprintln!("╔══════════════════════════════════════════════════╗");
             eprintln!("║  APSL Runtime v0.1                              ║");
             eprintln!("║  Spec:   {:<39} ║", spec.display());
@@ -107,7 +113,10 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&record)?);
 
             if record.verified {
-                eprintln!("\n✓ All {} nodes passed. Proof chain verified.", record.proofs.len());
+                eprintln!(
+                    "\n✓ All {} nodes executed; no postcondition obligations were declared.",
+                    record.proofs.len()
+                );
             } else {
                 eprintln!("\n✗ Execution completed but postconditions NOT fully verified.");
                 std::process::exit(1);
@@ -116,26 +125,37 @@ fn main() -> Result<()> {
 
         Cmd::Nodes { spec, graph } => {
             let program = load_program(&spec)?;
-            let g = program.decls.iter().find_map(|d| match d {
-                apsl_core::ast::Decl::Graph(g) if g.name.as_str() == graph => Some(g),
-                _ => None,
-            }).with_context(|| format!("graph '{}' not found", graph))?;
+            let g = program
+                .decls
+                .iter()
+                .find_map(|d| match d {
+                    apsl_core::ast::Decl::Graph(g) if g.name.as_str() == graph => Some(g),
+                    _ => None,
+                })
+                .with_context(|| format!("graph '{}' not found", graph))?;
 
             let rt = Runtime::new(
                 program.clone(),
                 AdapterRegistry::new(&PathBuf::from("."), &PathBuf::from("vault")),
-                Manifest { graph: graph.clone(), ..Manifest::default() },
+                Manifest {
+                    graph: graph.clone(),
+                    ..Manifest::default()
+                },
             );
 
             for chain in &g.flow {
                 for step in chain {
                     for ident in &step.nodes {
                         let name = ident.as_str();
-                        if name == "in" || name == "out" { continue; }
+                        if name == "in" || name == "out" {
+                            continue;
+                        }
                         let via = program.decls.iter().find_map(|d| match d {
                             apsl_core::ast::Decl::Node(n) if n.name.as_str() == name => {
                                 n.via.as_ref().map(|v| {
-                                    let attrs: Vec<String> = v.attrs.iter()
+                                    let attrs: Vec<String> = v
+                                        .attrs
+                                        .iter()
                                         .map(|(k, val)| format!("{}={}", k, val))
                                         .collect();
                                     format!("@{} {}", v.tag, attrs.join(" "))
@@ -153,8 +173,8 @@ fn main() -> Result<()> {
         Cmd::Verify { record } => {
             let data = std::fs::read_to_string(&record)
                 .with_context(|| format!("cannot read {}", record.display()))?;
-            let rec: apsl_runtime::proof::ExecutionRecord = serde_json::from_str(&data)
-                .context("invalid execution record JSON")?;
+            let rec: apsl_runtime::proof::ExecutionRecord =
+                serde_json::from_str(&data).context("invalid execution record JSON")?;
 
             eprintln!("Graph:    {}", rec.graph);
             eprintln!("Spec:     {}", rec.spec_hash);
@@ -164,10 +184,16 @@ fn main() -> Result<()> {
 
             for proof in &rec.proofs {
                 let expected = apsl_runtime::proof::Proof::compute_hash(
-                    &proof.node, &proof.input_hash, &proof.output_hash, proof.completed_at
+                    &proof.node,
+                    &proof.input_hash,
+                    &proof.output_hash,
+                    proof.completed_at,
                 );
                 if expected != proof.proof_hash {
-                    eprintln!("✗ {} proof hash mismatch: expected {}, got {}", proof.node, expected, proof.proof_hash);
+                    eprintln!(
+                        "✗ {} proof hash mismatch: expected {}, got {}",
+                        proof.node, expected, proof.proof_hash
+                    );
                     std::process::exit(1);
                 }
                 eprintln!("✓ {} ({}ms)", proof.node, proof.duration_ms);

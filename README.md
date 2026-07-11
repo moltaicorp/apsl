@@ -6,95 +6,37 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust 2021](https://img.shields.io/badge/Rust-2021-orange.svg)](https://www.rust-lang.org/)
-[![Crates: 14](https://img.shields.io/badge/crates-14-green.svg)](#workspace)
+[![Crates: 15](https://img.shields.io/badge/crates-15-green.svg)](#workspace)
 
-APSL is a typed, certifiable specification language for composable protocol contracts.
+APSL is a typed specification language for composable protocol contracts. An APSL source file declares types, pure nodes, and graph-shaped flows. The toolchain parses and canonicalizes sources, resolves referenced symbols, checks graph composition, derives predicate complexity, analyzes predicates with an SMT solver, and emits signed certificates for specifications that pass those gates.
 
-If you've ever tried to coordinate 5 AI coding agents on the same codebase, you know the problem: they step on each other, nobody knows what anybody else is doing, and the resulting worktree merge is harder than the implementation was. APSL exists to make that scale to thousands.
+APSL verifies specifications. It does not prove that an arbitrary executable implements a specification.
 
-The idea is simple. Every unit of work is a **node** — a pure function with typed inputs, typed outputs, pre/post predicates, a proven complexity bound, and an SLA. Nodes compose into **graphs** (flow pipelines). The compiler type-checks every edge. If node A's output type matches node B's input type, they compose — and that's proven, not hoped. An agent implementing node A never needs to talk to the agent implementing node B. The spec is the contract. The certificate is the collaboration protocol.
+## Guarantees
 
-This means N agents can implement N nodes in parallel with zero coordination overhead — as long as each node's output type matches the next node's input type in the flow graph. No standups, no sync meetings, no merge conflicts on shared state. The APSL compiler is the arbiter: it parses, type-checks, derives complexity bounds from predicate structure, discharges predicates via SMT, and emits Ed25519-signed certificates. Each certificate witnesses that a node's spec is internally consistent, its complexity is ≤ O(n log n), and its pre/post predicates have been discharged via SMT (or flagged for review if the solver returns unknown or a counterexample). Specs are the artifact. Implementations are fungible. Certs prove verification.
+The tools establish distinct properties:
 
-## What APSL is, formally
+| Gate | Successful result |
+|---|---|
+| `apslc parse` | The source is syntactically valid and has a canonical AST. |
+| `apslc check` | Referenced symbols resolve and graph edges type-check. |
+| `apslc check --string-strict` | Every string-bearing use refers through a named semantic type, and free string literals are rejected in predicates. |
+| `apsl-lint complex` | Derived predicate complexity does not exceed O(n log n) per input-size variable. |
+| `apsl-lint pred` | Every reported clause is proved by the selected SMT solver. |
+| `apsl-cert emit` | Parsing, linking, typing, complexity, and predicate gates pass before any certificate is stored. |
+| `apsl-cert verify` | The certificate signature is valid for the supplied public key and its TCB manifest matches the pinned TCB. |
 
-APSL is a first-order, indentation-sensitive DSL with Hindley-Milner type inference. A `.apsl` file declares type aliases, nodes (pure functions with contracts), and graphs (flow compositions of nodes). The compiler pipeline: parse → link (symbol discovery, no imports) → typecheck (HM unification + flow composition) → complexity proof (derived from predicate structure) → SMT predicate discharge (Z3/CVC5) → Ed25519-signed certificate. Certificates are content-addressed (sha256), stored in a flat-file sharded store, and verifiable by anyone with the signer's public key. The membership predicate — every node's derived complexity must be ≤ O(n log n) per input size variable — is the complexity gate that keeps the language honest. Multi-variable terms like O(n·m) across distinct inputs are admitted; O(n²) over a single input is not.
+Certificate verification does not compare an executable with the optional implementation hash stored in a certificate. A certificate signature authenticates the certificate contents; it is not an implementation-refinement proof.
 
-APSL supports parameterized types: `World<S>` where `S` is the RootState identity. `World<A>` does not unify with `World<B>` — different state identities cannot compose. The flow checker supports fan-in: `flow (a, b) -> c` feeds the tuple of a's and b's outputs into c. When nodes thread `World<S>`, tuple sources flatten the World automatically: `((World<S>, X), (World<S>, Y))` becomes `(World<S>, X, Y)`.
-
-<p align="center">
-  <img src="assets/apsl-ouroboros-transparent.png" alt="APSL ouroboros">
-</p>
-
-## CLI Reference
-
-### `apslc` — compiler
-
-```
-apslc parse <file>   print canonical AST to stdout
-apslc canon <file>   same — canonical form IS the serialization
-apslc hash  <file>   print sha256 hex of canonical form
-apslc check <file>   parse + link + type-check, exit 0 if clean
-apslc deploy <file>  emit GitLab child-pipeline YAML from CI/CD-definition graph
-```
-
-Flags:
-
-| Flag | What it does |
-|------|-------------|
-| `--search-path <dirs>` | Colon-separated directories to search for symbols |
-| `--no-resolve` | Disable linker (error on unresolved symbols) |
-| `--show-deps` | Print resolved dependencies |
-| `--state` | Enforce state clause validation |
-| `--nominal` | Enforce nominal type equality (no structural aliasing) |
-| `--restricted` | Enforce capability narrowing (implies --nominal) |
-| `--strict` | Reject coarse types: every type alias must resolve to a unique structure |
-| `--rooted` | Reject bare `World` (must use `World<S>`) and enforce single-root connectedness |
-| `--migrate` | Strip unknown syntax for backward-compatible validation |
-| `--attest [path]` | NO-STRINGS LAW: scan implementation source for bare/unattested string literals |
-
-With `--attest`:
-
-| Flag | What it does |
-|------|-------------|
-| `--count` | Print only the offender count (query mode, exit 0) |
-| `--ratchet <file>` | Fault only on an INCREASE vs the baseline count in `<file>` |
-| `--bless` | (with --ratchet) lower the baseline ceiling to the current count |
-
-### `apsl-lint` — complexity prover + predicate discharge
-
-```
-apsl-lint check <file>            complexity + predicates
-apsl-lint complex <file>          complexity only
-apsl-lint pred <file>             predicate discharge only
-apsl-lint explain <file> <node>   derived cost + reasoning
-```
-
-### `apsl-cert` — certificate analyzer
-
-```
-apsl-cert key new <name>             generate Ed25519 keypair
-apsl-cert emit <file> --key <name>   verify file, emit signed cert per node, store
-apsl-cert verify <hash> --pub <name>  verify a stored cert (loads <name>.pub)
-apsl-cert verify <hash> --key <name>  verify (alias for --pub)
-apsl-cert show <hash>                pretty-print a stored cert
-```
-
-Store layout: `./.apsl-store/<aa>/<bb>/<rest>.cert`
-
-### Strictness layers
-
-APSL's strictness flags compose. Each adds a constraint the compiler enforces:
-
-1. **Default** (no flags): parse + link + typecheck. Types unify structurally. `World` is a plain base type.
-2. `--nominal`: type aliases don't unify structurally — `Email` ≠ `String` even if `type Email = String`.
-3. `--restricted`: `--nominal` + capability narrowing (outputs must be narrower than inputs).
-4. `--strict`: every type alias must resolve to a unique structure (no two aliases with the same shape).
-5. `--rooted`: `World` must be `World<S>` (parameterized with a RootState). A `.apsl` file must be one weakly-connected DAG with a single entry root. Different `World<S>` identities don't compose.
-
-Flags stack: `apslc check spec.apsl --strict --rooted --state` enforces all five layers.
+The runtime executes graph nodes through adapters. A zero exit status means execution succeeded. It does not prove a postcondition. Execution records remain unverified when any executed node declares a postcondition, and `apsl verify` checks record-hash integrity rather than implementation correctness.
 
 ## Installation
+
+Requirements:
+
+- Current stable Rust with Cargo
+- Z3 for predicate discharge and certificate emission
+- CVC5 as an optional solver fallback
 
 ```bash
 git clone https://github.com/moltaicorp/apsl.git
@@ -102,54 +44,17 @@ cd apsl
 cargo build --release
 ```
 
-### Prerequisites
+The workspace builds five binaries in `target/release`:
 
-- **Rust** 1.70+ (2021 edition)
-- **Z3** (for SMT predicate discharge) — install via `apt install z3` on Ubuntu, `brew install z3` on macOS, or download from [the Z3 release page](https://github.com/Z3Prover/z3/releases)
-- **CVC5** (optional alternative SMT solver)
+| Binary | Purpose |
+|---|---|
+| `apslc` | Parse, canonicalize, hash, link, type-check, compile artifacts, and deploy. |
+| `apsl-lint` | Derive complexity and discharge predicates. |
+| `apsl-cert` | Generate keys and emit, inspect, or verify certificates. |
+| `apsl` | List and execute graph nodes and inspect execution records. |
+| `apsl-workbench` | Serve the HTTP workbench. |
 
-The build itself needs only Rust. Z3 is required only for `apsl-lint` predicate discharge and `apsl-cert emit`. If Z3 is not installed, the solver falls back to `Unknown` — certs are still emitted but predicate proofs carry no force.
-
-> **Note:** `cargo build` produces warnings (unused imports, dead code in modules not yet wired to CLIs). These are expected in the current development stage and do not affect functionality.
-
-Four binaries land in `target/release/`:
-
-| Binary | What it does |
-|--------|-------------|
-| `apslc` | Parse, canonicalize, hash, type-check |
-| `apsl-lint` | Complexity proof + SMT predicate discharge |
-| `apsl-cert` | Key generation, certificate emission, verification |
-| `apsl` | Graph runtime: run graphs, verify execution, list nodes |
-
-No `import` or `use` keywords needed. Reference a symbol; the linker discovers it by scanning `.apsl` files on the search path.
-
-## Quick Start
-
-```bash
-# Type-check the example pipeline
-./target/release/apslc check examples/dedupe.apsl
-
-# Run the complexity prover + SMT predicate discharge
-./target/release/apsl-lint check examples/dedupe.apsl
-
-# Generate a signing keypair and emit signed certificates
-./target/release/apsl-cert key new demo
-./target/release/apsl-cert emit examples/dedupe.apsl --key demo
-
-# Verify a certificate (inspect with `apsl-cert show <hash>` first)
-./target/release/apsl-cert show <hash>
-./target/release/apsl-cert verify <hash> --pub demo
-```
-
-## Tutorials
-
-### 1. Your first spec — `examples/dedupe.apsl`
-
-```bash
-cargo run --bin apslc -- check examples/dedupe.apsl
-```
-
-This spec defines an email deduplication pipeline. Four nodes compose into a graph:
+## Language overview
 
 ```apsl
 type Email = String
@@ -172,127 +77,209 @@ classify : Email[] -> Email[]
 
 send : Email[] -> MessageId[]
   cx    O(n) idem-complex
-  sla   e <= 0, d <= 1e-6, T <= 200ms
 
 graph email_pipeline : String[] -> MessageId[]
   flow  in -> normalize -> dedupe -> classify -> send -> out
 ```
 
-Each node has a typed signature, optional pre/post predicates, a complexity claim (`cx`), and an SLA. The graph composes them under `flow`. `apslc check` parses, links, and type-checks every edge. The `classify` node carries `via @statistical holdout=intents_v3` — a cert-provenance annotation saying its correctness is discharged by statistical evaluation, not SMT proof. APSL also supports `via @external service=<id>` for nodes whose correctness depends on a named external service (e.g., a vault, database, or identity provider). See [docs/SPEC.yaml](docs/SPEC.yaml) for the full `via` grammar.
+Node signatures are pure functions. Graph flow edges compose when the preceding output type unifies with the following input type. Fan-in preserves ordinary tuple outputs as nested tuples. When fan-in combines values shaped as `(World<S>, X)`, it deduplicates the shared `World<S>` and produces `(World<S>, X, ...)`.
 
-Now run the full verification pipeline:
+APSL is first-order. It has no lambda abstraction or general higher-order functions. A fixed primitive environment supports predicate combinators such as `every`, `some`, `map`, `filter`, `fold`, `unique?`, and `subseteq?`.
 
-```bash
-# Step 1: Complexity proof + SMT predicate discharge
-cargo run --bin apsl-lint -- check examples/dedupe.apsl
+## Quick start
 
-# Step 2: Generate a signing keypair (one-time)
-cargo run -p apsl-cert-cli -- key new demo
-
-# Step 3: Emit signed certificates for all nodes
-cargo run -p apsl-cert-cli -- emit examples/dedupe.apsl --key demo
-
-# Step 4: Verify a certificate by hash (uses only the public key)
-cargo run -p apsl-cert-cli -- verify <hash> --pub demo
-```
-
-> **Note:** The linter's SMT encoder treats `unique?` and `subseteq?` as uninterpreted predicates. Depending on your Z3 version, the solver may return `Unknown` or produce counterexamples for these. This is expected — the predicates are discharged on a best-effort basis. The structural guarantees (type-checking, complexity proof) always succeed; predicate discharge is best-effort.
-
-> **Note:** `apsl-cert emit` signs certificates for all nodes regardless of SMT predicate discharge status. A certificate records the *verdict* (including `Unknown` or counterexample results), not just passing checks. Inspect the cert with `apsl-cert show <hash>` to see per-clause status.
-
-### 2. World threading — `examples/world_threading.apsl`
-
-APSL has no side-effect category. Anything that "side-effects" — a network call, a crypto signature, a state transition — is encoded as a pure function whose signature names the world explicitly:
-
-```apsl
-type World = Int
-type Bearer = String
-type Token = String
-type Url = String
-type Response = String
-
-mint_token : (w: World, b: Bearer) -> (World, Token)
-  cx    O(1) idem
-
-http_post : (w: World, u: Url, body: Token) -> (World, Response)
-  cx    O(1) idem-complex
-  sla   d <= 1/1000, T <= 200ms
-```
-
-The `(World, X) -> (World, Y)` shape is how state is threaded without side effects. The math stays pure. Composition obligations remain "post of A implies pre of B." There is no `@cryptographic` or `@network` tag — the type signature already carries the obligation.
+Type-check the examples:
 
 ```bash
-cargo run --bin apslc -- check examples/world_threading.apsl
+./target/release/apslc check examples/dedupe.apsl
+./target/release/apslc check examples/world_threading.apsl
 ```
 
-### 3. When the linter pushes back — `examples/bad_n_squared.apsl`
-
-```apsl
-all_pairs_distinct : Int[] -> Bool
-  post  forall x in in. forall y in in. x != y or x = y
-  cx    O(n log n) idem
-```
-
-This node nests two quantifiers over the same input. The derived complexity is O(n²), which exceeds the O(n log n) membership gate. The linter rejects it and hints toward reformulation:
+Run a complete green lint pass on the world-threading example:
 
 ```bash
-cargo run --bin apsl-lint -- check examples/bad_n_squared.apsl
+./target/release/apsl-lint check examples/world_threading.apsl
 ```
 
-This is the complexity gate in action — it catches O(n²) shapes at spec time, before any implementation is written. The gate also flags mismatches: if you declare `cx O(n)` but your predicates derive O(n log n), the linter reports an overpromise. It does not, however, inspect your implementation — a bubble sort behind an O(n log n) spec passes every check. APSL proves the spec is consistent, not that your code matches it.
+The dedupe example type-checks and passes the complexity gate, but its predicates depend on uninterpreted email and collection semantics. Predicate discharge therefore reports counterexamples and exits nonzero:
+
+```bash
+./target/release/apsl-lint complex examples/dedupe.apsl
+./target/release/apsl-lint pred examples/dedupe.apsl
+```
+
+The first command succeeds. The second is an intentional demonstration of fail-closed predicate analysis.
+
+The quadratic example is an intentional negative fixture:
+
+```bash
+./target/release/apslc check examples/bad_n_squared.apsl
+./target/release/apsl-lint complex examples/bad_n_squared.apsl
+```
+
+It type-checks, then the complexity command rejects its nested quantifiers with a nonzero exit status.
+
+## Compiler
+
+```text
+apslc parse <file>
+apslc canon <file>
+apslc hash <file>
+apslc check <file>
+apslc compile <file>
+apslc deploy <file>
+```
+
+`parse` and `canon` print the canonical AST. `hash` prints its SHA-256 digest. `check` links and type-checks. `compile` emits the checked canonical graph/type artifact. `deploy` emits GitLab child-pipeline YAML for a source carrying deployment clauses.
+
+Compiler flags:
+
+| Flag | Behavior |
+|---|---|
+| `--search-path <dirs>` | Add colon-separated linker search directories. |
+| `--no-resolve` | Disable external symbol resolution. |
+| `--show-deps` | Print resolved symbols and source locations. |
+| `--state` | Validate exact state ownership, fixed defaults, and duplicate keys at one owner. |
+| `--nominal` | Require nominal equality between aliased edge types. |
+| `--restricted` | Require capability narrowing and enable nominal checking. |
+| `--strict` | Reject aliases that resolve to duplicate structural shapes. |
+| `--rooted` | Reject bare `World` and require a single weakly connected root. |
+| `--migrate` | Strip unsupported clauses during compatibility migration. |
+| `--string-strict` | Reject raw string-bearing uses that do not pass through named semantic types. |
+
+There are no import statements. Referencing an unresolved type, node, graph, or predicate invokes the linker. Search paths come from explicit flags, `APSL_PATH`, `.apsl-path`, the source directory, and the workspace root.
+
+The canonical self-spec is `apsl.apsl`. `ouroboros.apsl` is a linker-only graph that resolves its `apsl` node and types from the canonical file.
+
+## Linter
+
+```text
+apsl-lint check <file>
+apsl-lint complex <file>
+apsl-lint pred <file>
+apsl-lint explain <file> <node>
+```
+
+The linter resolves linked declarations before type-checking. `check` succeeds only when both complexity and predicate gates succeed. `pred` treats counterexamples and encoding errors as failures. Solver `Unknown` results are printed but are not proofs.
+
+The SMT encoder models implementation behavior as an uninterpreted function. A `proved` result means the negated postcondition is unsatisfiable under the encoded assumptions even with that uninterpreted implementation. It does not establish that concrete source code satisfies the node contract.
+
+## Certificates
+
+```text
+apsl-cert key new <name>
+apsl-cert emit <file> --key <name>
+apsl-cert verify <hash> --pub <name>
+apsl-cert verify <hash> --key <name>
+apsl-cert show <hash>
+```
+
+`emit` resolves linked declarations and refuses to write any certificate if the source has a type error, exceeds the complexity gate, or contains a predicate verdict other than `Proved`. Successful certificates are stored under `.apsl-store` by certificate hash.
+
+```bash
+./target/release/apsl-cert key new demo
+./target/release/apsl-cert emit examples/world_threading.apsl --key demo
+```
+
+The emit command prints one hash and node name per certificate. Use any printed hash with `show` and `verify`:
+
+```bash
+./target/release/apsl-cert show HASH
+./target/release/apsl-cert verify HASH --pub demo
+```
+
+Private keys are written with owner-only permissions. Generated keys and `.apsl-store` are ignored by Git.
+
+## Runtime
+
+```text
+apsl nodes --graph <graph> <spec>
+apsl run --graph <graph> [options] <spec>
+apsl verify <record>
+```
+
+`nodes` lists graph nodes and their `via` metadata. `run` executes node adapters and emits an execution record. Shell adapters read `APSL_INPUT` and return JSON on standard output. `verify` recomputes each proof hash in a saved record and exits nonzero on a mismatch.
+
+The runtime does not evaluate APSL predicates. A successful process exit and a valid execution-record hash are operational facts, not contract proofs.
+
+The current runtime linearizes named nodes and threads one value through that order. APSL type-checking supports fan-in graphs, but the runtime does not yet materialize branch-specific values or fan-in routing.
+
+## Workbench
+
+```bash
+cargo run -p apsl-workbench
+```
+
+The workbench listens on `0.0.0.0:8800` by default. Set `WB_ADDR` to override the address. It exposes `/healthz`, `/compile`, `/build`, and `/verify`.
+
+## Strictness
+
+Default checking uses structural alias resolution. Additional flags enforce stronger constraints:
+
+1. `--nominal` distinguishes aliases by name.
+2. `--restricted` permits only declared subtype narrowing across graph edges.
+3. `--strict` rejects multiple aliases with the same structural representation.
+4. `--rooted` requires parameterized worlds and a single rooted graph.
+5. `--state` preserves positional ownership, validates fixed defaults, and rejects duplicate keys at one owner.
+6. `--string-strict` requires named semantic types for string-bearing values and rejects free predicate strings.
+
+These modes are opt-in and may reject sources that are valid under default structural checking.
+
+### State position and fungibility
+
+A state key is local to its declaring node or graph root. Authority uses the canonical graph hash, the owner's ordered ordinal path, and the state declaration ordinal. The key is a diagnostic label: equal key names at different positions are distinct and are never hoisted or deduplicated.
+
+Under `--string-strict`, `String` is a representation boundary for named semantic types, not a valid type at a node, graph, record field, parameterized argument, or state use site. For example, `type Endpoint = String` followed by `state origin : Endpoint` is valid, while `state origin : String` is not. This names the semantic type without manufacturing a separate type for every state instance.
+
+A state declaration without a default is abstract and makes its node positional. A declaration with a type-correct default is fixed by the canonical contract. Nodes with no abstract state are fungible at the APSL composition boundary: graph edges may substitute contracts with compatible compiled signatures. This is a specification property, not proof that any particular executable implements the contract.
+
+### Compiled graph/type artifact
+
+`apslc compile FILE` emits `apsl.compiled-graph-types.v1` as exact canonical UTF-8. The command accepts the same composable checking flags as `apslc check`; for example:
+
+```bash
+./target/release/apslc compile protocol.apsl --state --string-strict > protocol.apsl.canon
+sha256sum protocol.apsl.canon
+```
+
+The artifact records mandatory typing and the selected artifact-native `state` and `string-strict` checks. Other compiler policy flags may reject emission but are not serialized as artifact check identifiers. The artifact also contains a canonical semantic type table, separate signature and full-contract hashes, ordered state declarations, graph occurrences and typed flow references, derived placement, and state addresses. Its whole-artifact identity is SHA-256 of the emitted bytes. It contains no implementation paths, language bindings, source scan results, or executable-conformance claims.
 
 ## Workspace
 
 | Crate | Role |
 |---|---|
-| `apsl-core` | AST, canonical JSON serialization, sha256 content addressing |
-| `apsl-parse` | Indentation-sensitive lexer + recursive-descent parser |
-| `apsl-types` | Hindley-Milner type checker, primitive environment |
-| `apsl-complex` | O(n log n) complexity prover, parallelism hints |
-| `apsl-smt` | SMT-LIB v2 encoder, Z3/CVC5 subprocess, counter-example explainer |
-| `apsl-cert` | Ed25519 certificates, content-addressed store, TCB manifest |
-| `apsl-link` | Symbol discovery (no imports — ripgrep-style parallel scan) |
-| `apsl-runtime` | Graph executor + adapters (shell, vault) |
-| `apsl-verify` | Numeric satisfaction solver (library only; not exposed via a CLI binary yet) |
-| `apsl-workbench` | Web workbench: `cargo run -p apsl-workbench` starts an HTTP server on `localhost:7878` with routes for `/healthz`, `/compile`, `/build`, `/verify` |
-| `apslc` | CLI: parse / canon / hash / check |
-| `apsl-lint` | CLI: complex / pred / check |
-| `apsl-cert-cli` | CLI: key new / emit / verify / show |
-| `apsl` | APSL runtime binary: run graphs, verify execution records, list nodes |
+| `apsl-core` | AST, canonical serialization, and hashing. |
+| `apsl-parse` | Lexer and parser. |
+| `apsl-types` | Type inference and graph composition. |
+| `apsl-complex` | Predicate-complexity derivation. |
+| `apsl-smt` | SMT encoding, solver processes, and verdicts. |
+| `apsl-cert` | Certificates, keys, TCB manifests, and storage. |
+| `apsl-link` | Cross-file symbol discovery and resolution. |
+| `apsl-artifact` | Checked canonical graph/type artifact production. |
+| `apsl-runtime` | Graph execution and execution records. |
+| `apsl-verify` | Numeric sampling verifier library. |
+| `apsl-workbench` | HTTP workbench and candidate-resolution experiments. |
+| `apslc` | Compiler binary. |
+| `apsl-lint` | Linter binary. |
+| `apsl-cert-cli` | Certificate binary. |
+| `apsl` | Runtime binary. |
 
-## What APSL does NOT guarantee
+## Repository specifications
 
-The cert proves the **spec** is internally consistent. It does not prove any concrete implementation satisfies the spec. You could implement an O(n log n)-certified node with a bubble sort and the cert stays green. APSL is a proof system for specifications, not a runtime verifier. The bridge — `via @implementation verified_by=<tool>` — is documented as future work and does not exist in code yet.
+`apsl.apsl` specifies the public APSL toolchain surface. The `examples` directory contains two positive composition examples and one intentional complexity rejection. The `proofs` directory contains type-checked proof DAGs and supporting prose. The `tests` directory contains nominal and restricted-mode positive and negative fixtures.
 
-Testing your implementation against the spec's pre/post predicates is your responsibility. The `apsl-runtime` crate can execute graphs by shelling out to named binaries, but its post-condition check is currently a stub (`// TODO`). The cert's `impl_hash` field is populated only when you pass `--impl-hash <hash>` to `apsl-cert emit`; without it, the field is empty. This lets you opt in to binding a certificate to a specific implementation artifact.
+The proof DAGs establish that their declared dependency edges compose as typed APSL graphs. They do not establish the mathematical truth of undeclared axioms or prove concrete implementations. `soundness-phase-bound.apsl` is type-valid but intentionally not certifiable: its positive-output postconditions remain implementation obligations, and predicate discharge rejects them.
 
-This is stated candidly because it matters: APSL narrows the problem from "is this code correct?" to "is this spec consistent, and does this implementation match this spec's signature?" The first is proven by the compiler. The second is enforced by Rust's type system and your tests.
+## Development
 
-### Expressiveness limits
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace
+./scripts/verify-apsl.sh
+```
 
-APSL is first-order: no higher-order functions, no lambda abstraction, no type-level computation beyond unification. Predicates are restricted to what Z3/CVC5 can encode — if your post-condition requires reasoning about recursive data structures, non-linear arithmetic over unbounded domains, or heap shape, the solver will likely return `Unknown`. The complexity gate is syntactic: it derives Big-O from predicate structure and rejects anything exceeding O(n log n). There is no escape hatch. If your algorithm is genuinely O(n²), APSL is the wrong tool.
-
-## Proofs and whitepapers
-
-The `proofs/` directory contains formal work expressed as APSL specs:
-
-- [**Principia Computia**](proofs/principia-computia.apsl) — A computation graph as a cryptographic object whose nodes are typed operators, edges are keys, and execution traces compose back to a passkey-rooted authority. If it compiles, the logical structure of the provenance framework is sound.
-- [**GI ∈ DTIME(n¹⁷)**](proofs/proof-n17-full.apsl) — Complete APSL decomposition of the graph isomorphism proof chain. 39 atomic nodes, each performing exactly one logical step. Types are propositions; if it type-checks, the dependencies hold. Predicates are `post true` by design — the type-level composition IS the proof; SMT discharge confirms well-formedness, not mathematical truth of the underlying theorem.
-- [**Spectral Rigidity**](proofs/spectral-rigidity.apsl) / [**Soundness & Phase Bound**](proofs/soundness-phase-bound.apsl) / [**Cofactor Chain**](proofs/cofactor-chain.apsl) — Decomposition of theorems from the n¹⁷ proof into atomic inference steps.
-
-> **Note:** Proof decomposition files use `cx` annotations as structural metadata, not as complexity-gated claims. Some nodes carry `O(n*n)` because the decomposition step's complexity is quadratic in the graph size. The O(n log n) membership gate applies to application specs, not to proof decompositions.
-
-**Decomposition files** (atomic step decompositions of the n¹⁷ proof chain):
-
-- [decomp-cofactor-ab](proofs/decomp-cofactor-ab.apsl) / [decomp-cofactor-cd](proofs/decomp-cofactor-cd.apsl) / [decomp-cofactor-ef](proofs/decomp-cofactor-ef.apsl) — Cofactor extraction lemma decompositions (6.21a–f)
-- [decomp-rigidity](proofs/decomp-rigidity.apsl) — Spectral rigidity step decomposition
-- [decomp-critical-node](proofs/decomp-critical-node.apsl) / [decomp-false-node](proofs/decomp-false-node.apsl) — Critical and false node identification
-- [decomp-round4a](proofs/decomp-round4a.apsl) / [decomp-round4b](proofs/decomp-round4b.apsl) — Round 4 decomposition
-- [decomp-discriminant](proofs/decomp-discriminant.apsl) / [decomp-bound-assembly](proofs/decomp-bound-assembly.apsl) — Discriminant and bound assembly
-- [axioms-algebra](proofs/axioms-algebra.apsl) / [axioms-analysis](proofs/axioms-analysis.apsl) / [axioms-ift](proofs/axioms-ift.apsl) — Axiom declarations (algebraic, analytic, IFT)
-- [**Toward Mechanized Verification via Typed Proof DAGs**](proofs/section-mechanized-verification.md) — The propositions-as-types correspondence applied at the graph level: every type is a proposition, every node is a single inference step, a well-typed composition *is* a proof.
-
-For the complete language specification, see [docs/SPEC.yaml](docs/SPEC.yaml). For a candid, code-level walkthrough of what every crate actually does (and what it doesn't), see [docs/APSL-FULL-IMPLEMENTATION.md](docs/APSL-FULL-IMPLEMENTATION.md). For the agent collaboration protocol, see [AGENTS.md](AGENTS.md).
+All four commands are required for a clean workspace. The APSL verification script checks every specification and asserts the documented negative fixtures fail at their intended gates.
 
 ## License
 

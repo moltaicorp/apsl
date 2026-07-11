@@ -1,4 +1,3 @@
-
 use ed25519_dalek::SigningKey;
 
 use apsl_cert::cert::{emit, ClauseProof};
@@ -22,6 +21,7 @@ pub enum CompileError {
     Parse(String),
     Type(String),
     ComplexityExceeds(String),
+    Predicate(String),
     Store(String),
     NoNodes,
 }
@@ -32,6 +32,7 @@ impl CompileError {
             CompileError::Parse(_) => "parse",
             CompileError::Type(_) => "typecheck",
             CompileError::ComplexityExceeds(_) => "complexity",
+            CompileError::Predicate(_) => "predicate",
             CompileError::Store(_) => "store",
             CompileError::NoNodes => "parse",
         }
@@ -41,6 +42,7 @@ impl CompileError {
             CompileError::Parse(m)
             | CompileError::Type(m)
             | CompileError::ComplexityExceeds(m)
+            | CompileError::Predicate(m)
             | CompileError::Store(m) => m.clone(),
             CompileError::NoNodes => "no nodes in source".into(),
         }
@@ -76,7 +78,7 @@ pub fn compile(
     let solver = default_solver();
     let tcb = pinned_tcb();
 
-    let mut out = Vec::new();
+    let mut pending = Vec::new();
     for d in &tp.program.decls {
         let Decl::Node(n) = d else { continue };
         let cx_entry = cx_report.per_node.iter().find(|r| r.node == n.name);
@@ -98,15 +100,36 @@ pub fn compile(
             )));
         }
         let dr = discharge_node(n, &EmptyTypeOracle, &*solver);
+        for clause in &dr.per_clause {
+            match &clause.status {
+                ClauseStatus::Proved => {}
+                ClauseStatus::Counterexample(_) => {
+                    return Err(CompileError::Predicate(format!(
+                        "{} clause {} has a counterexample",
+                        n.name, clause.clause_id
+                    )));
+                }
+                ClauseStatus::Unknown(message) => {
+                    return Err(CompileError::Predicate(format!(
+                        "{} clause {} is unknown: {}",
+                        n.name, clause.clause_id, message
+                    )));
+                }
+                ClauseStatus::EncodingError(message) => {
+                    return Err(CompileError::Predicate(format!(
+                        "{} clause {} encoding failed: {}",
+                        n.name, clause.clause_id, message
+                    )));
+                }
+            }
+        }
         let proofs: Vec<ClauseProof> = dr
             .per_clause
             .iter()
             .map(|c| {
                 let (verdict, note) = match &c.status {
                     ClauseStatus::Proved => ("proved", String::new()),
-                    ClauseStatus::Counterexample(_) => {
-                        ("cex", "counterexample reported".into())
-                    }
+                    ClauseStatus::Counterexample(_) => ("cex", "counterexample reported".into()),
                     ClauseStatus::Unknown(m) => ("unknown", m.clone()),
                     ClauseStatus::EncodingError(m) => ("error", m.clone()),
                 };
@@ -127,15 +150,19 @@ pub fn compile(
             tcb.clone(),
             key,
         );
-        let hash = put(&cert, store_base).map_err(|e| CompileError::Store(e.to_string()))?;
+        pending.push((n.name.as_str().to_string(), bound, cert));
+    }
+    if pending.is_empty() {
+        return Err(CompileError::NoNodes);
+    }
+    let mut out = Vec::with_capacity(pending.len());
+    for (node, bound, cert) in pending {
+        let cert_hash = put(&cert, store_base).map_err(|e| CompileError::Store(e.to_string()))?;
         out.push(CertResult {
-            node: n.name.as_str().to_string(),
-            cert_hash: hash,
+            node,
+            cert_hash,
             impl_hash: bound.unwrap_or_default(),
         });
-    }
-    if out.is_empty() {
-        return Err(CompileError::NoNodes);
     }
     Ok(out)
 }
@@ -167,11 +194,10 @@ pub fn render_cx(e: &CxExpr) -> String {
             Sum(es) => {
                 let top = es
                     .iter()
-                    .map(|x| dominant_weight(x))
+                    .map(dominant_weight)
                     .max()
                     .unwrap_or(Weight::Const);
-                let keep: Vec<&CxExpr> =
-                    es.iter().filter(|x| dominant_weight(x) == top).collect();
+                let keep: Vec<&CxExpr> = es.iter().filter(|x| dominant_weight(x) == top).collect();
                 keep.iter().map(|x| r(x)).collect::<Vec<_>>().join(" + ")
             }
             Prod(es) => {

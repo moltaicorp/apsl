@@ -1,4 +1,3 @@
-
 use apsl_core::ast::Node;
 
 use crate::encode::{encode_vc, TypeOracle};
@@ -32,7 +31,10 @@ pub fn discharge_node(node: &Node, types: &dyn TypeOracle, solver: &dyn Solver) 
         SolverResult::Unknown(msg) => ClauseStatus::Unknown(msg),
         SolverResult::Error(msg) => ClauseStatus::EncodingError(msg),
     };
-    report.per_clause.push(ClauseResult { clause_id: 0, status });
+    report.per_clause.push(ClauseResult {
+        clause_id: 0,
+        status,
+    });
     report
 }
 
@@ -47,14 +49,23 @@ mod tests {
         Node {
             name: Ident::new("t"),
             sig: TypeSig {
-                params: vec![Param { name: Ident::new("in"), ty: Type::Base(Ident::new("Int")) }],
+                params: vec![Param {
+                    name: Ident::new("in"),
+                    ty: Type::Base(Ident::new("Int")),
+                }],
                 ret: Type::Base(Ident::new("Int")),
             },
             pre: vec![],
             post: vec![Expr::Lit(Lit::Bool(true), Span::NONE)],
-            cx: CxSpec { bigo: CxExpr::Const, class: RuntimeClass::Idem },
-            sla: None, via: None,
-            auth: AuthLevel::None, scope_constraint: ScopeConstraint::Any, audit_req: AuditReq::None,
+            cx: CxSpec {
+                bigo: CxExpr::Const,
+                class: RuntimeClass::Idem,
+            },
+            sla: None,
+            via: None,
+            auth: AuthLevel::None,
+            scope_constraint: ScopeConstraint::Any,
+            audit_req: AuditReq::None,
             state: vec![],
             deploy: None,
             span: Span::NONE,

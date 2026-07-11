@@ -1,4 +1,3 @@
-
 use std::collections::BTreeSet;
 
 use apsl_core::ast::*;
@@ -30,9 +29,15 @@ pub fn unresolved_symbols(p: &Program, local: &BTreeSet<String>) -> BTreeSet<Str
         match d {
             Decl::Type(ta) => {
                 collect_type_refs(&ta.rhs, &mut referenced);
+                for supertype in &ta.supertypes {
+                    referenced.insert(supertype.as_str().to_string());
+                }
             }
             Decl::Node(n) => {
                 collect_sig_refs(&n.sig, &mut referenced);
+                for state in &n.state {
+                    collect_type_refs(&state.ty, &mut referenced);
+                }
                 let mut node_bound = bound.clone();
                 for p in &n.sig.params {
                     node_bound.insert(p.name.as_str().to_string());
@@ -43,6 +48,9 @@ pub fn unresolved_symbols(p: &Program, local: &BTreeSet<String>) -> BTreeSet<Str
             }
             Decl::Graph(g) => {
                 collect_sig_refs(&g.sig, &mut referenced);
+                for state in &g.state {
+                    collect_type_refs(&state.ty, &mut referenced);
+                }
                 let mut graph_bound = bound.clone();
                 for p in &g.sig.params {
                     graph_bound.insert(p.name.as_str().to_string());
@@ -67,9 +75,7 @@ pub fn unresolved_symbols(p: &Program, local: &BTreeSet<String>) -> BTreeSet<Str
     referenced
         .into_iter()
         .filter(|s| {
-            !local.contains(s)
-                && !BASE_TYPES.contains(&s.as_str())
-                && !apsl_types::is_primitive(s)
+            !local.contains(s) && !BASE_TYPES.contains(&s.as_str()) && !apsl_types::is_primitive(s)
         })
         .collect()
 }
@@ -119,7 +125,10 @@ fn collect_expr_refs(e: &Expr, out: &mut BTreeSet<String>, bound: &BTreeSet<Stri
         Expr::Lit(_, _) => {}
         Expr::Var(id, _) => {
             let name = id.as_str();
-            if name != "in" && name != "out" && name != "true" && name != "false"
+            if name != "in"
+                && name != "out"
+                && name != "true"
+                && name != "false"
                 && !bound.contains(name)
             {
                 out.insert(name.to_string());

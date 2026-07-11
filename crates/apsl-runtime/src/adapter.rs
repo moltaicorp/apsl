@@ -1,4 +1,3 @@
-
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -42,8 +41,8 @@ impl Adapter for ShellAdapter {
             );
         }
 
-        let input_json = serde_json::to_string(&input.values)
-            .context("shell adapter: serialize input")?;
+        let input_json =
+            serde_json::to_string(&input.values).context("shell adapter: serialize input")?;
 
         let mut cmd = Command::new(&script);
         cmd.env("APSL_NODE", &input.node_name);
@@ -84,11 +83,11 @@ pub struct VaultAdapter {
 
 impl Adapter for VaultAdapter {
     fn execute(&self, input: &NodeInput) -> Result<NodeOutput> {
-        let op = input.attrs.get("op")
-            .map(|s| s.as_str())
-            .unwrap_or("read");
+        let op = input.attrs.get("op").map(|s| s.as_str()).unwrap_or("read");
 
-        let path = input.values.get("path")
+        let path = input
+            .values
+            .get("path")
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
@@ -102,7 +101,8 @@ impl Adapter for VaultAdapter {
             }
         }
 
-        let output = cmd.output()
+        let output = cmd
+            .output()
             .with_context(|| format!("vault adapter: failed to run {} {}", op, path))?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -129,23 +129,38 @@ pub struct AdapterRegistry {
 }
 
 impl AdapterRegistry {
+    pub fn with_default(default: Box<dyn Adapter>) -> Self {
+        Self {
+            adapters: HashMap::new(),
+            default,
+        }
+    }
+
     pub fn new(nodes_dir: &Path, vault_bin: &Path) -> Self {
         let mut adapters: HashMap<String, Box<dyn Adapter>> = HashMap::new();
 
         adapters.insert(
             "vault_kv_v2".into(),
-            Box::new(VaultAdapter { vault_bin: vault_bin.to_path_buf() }),
+            Box::new(VaultAdapter {
+                vault_bin: vault_bin.to_path_buf(),
+            }),
         );
 
         Self {
             adapters,
-            default: Box::new(ShellAdapter { nodes_dir: nodes_dir.to_path_buf() }),
+            default: Box::new(ShellAdapter {
+                nodes_dir: nodes_dir.to_path_buf(),
+            }),
         }
     }
 
     pub fn dispatch(&self, service: Option<&str>) -> &dyn Adapter {
         match service {
-            Some(svc) => self.adapters.get(svc).map(|a| a.as_ref()).unwrap_or(&*self.default),
+            Some(svc) => self
+                .adapters
+                .get(svc)
+                .map(|a| a.as_ref())
+                .unwrap_or(&*self.default),
             None => &*self.default,
         }
     }

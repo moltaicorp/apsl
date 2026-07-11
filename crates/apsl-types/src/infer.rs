@@ -1,10 +1,10 @@
-
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 
+#[cfg(test)]
+use apsl_core::ast::Ident;
 use apsl_core::ast::{
-    BinOp, Decl, Expr, FlowStep, Graph, Ident, Lit, Node, Program, Quant, Span, Type as AstType,
-    TypeAlias, UnOp,
+    BinOp, Decl, Expr, Graph, Lit, Node, Program, Quant, Span, Type as AstType, TypeAlias, UnOp,
 };
 
 use crate::env::{lambda_slot, primitives};
@@ -21,12 +21,24 @@ pub type TypeMap = HashMap<Span, Ty>;
 #[derive(Debug, Clone)]
 pub enum TypeErrorKind {
     UnknownName(String),
-    Arity { name: String, expected: usize, found: usize },
-    Unify(UnifyError),
+    Arity {
+        name: String,
+        expected: usize,
+        found: usize,
+    },
+    Unify(Box<UnifyError>),
     NotATuple(Ty),
-    BadIndex { ty: Ty, index: String },
+    BadIndex {
+        ty: Ty,
+        index: String,
+    },
     AliasCycle(String),
-    FlowMismatch { left: String, right: String, want: Ty, got: Ty },
+    FlowMismatch {
+        left: String,
+        right: String,
+        want: Box<Ty>,
+        got: Box<Ty>,
+    },
     NotPredicate(Ty),
 }
 
@@ -38,7 +50,9 @@ pub struct TypeError {
 }
 
 impl fmt::Display for TypeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(&self.msg) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.msg)
+    }
 }
 
 pub fn type_check(p: &Program) -> Result<TypedProgram, Vec<TypeError>> {
@@ -73,7 +87,10 @@ pub fn type_check(p: &Program) -> Result<TypedProgram, Vec<TypeError>> {
     }
 
     if errors.is_empty() {
-        Ok(TypedProgram { program: p.clone(), types })
+        Ok(TypedProgram {
+            program: p.clone(),
+            types,
+        })
     } else {
         Err(errors)
     }
@@ -90,7 +107,12 @@ fn collect_aliases(p: &Program) -> BTreeMap<String, AstType> {
 }
 
 fn scheme_for_signature(n: &Node, aliases: &BTreeMap<String, AstType>) -> Scheme {
-    let args: Vec<Ty> = n.sig.params.iter().map(|p| ast_type_to_ty(&p.ty, aliases)).collect();
+    let args: Vec<Ty> = n
+        .sig
+        .params
+        .iter()
+        .map(|p| ast_type_to_ty(&p.ty, aliases))
+        .collect();
     let ret = ast_type_to_ty(&n.sig.ret, aliases);
     Scheme::mono(Ty::Fun(args, Box::new(ret)))
 }
@@ -109,7 +131,10 @@ fn check_node(
 
     let in_ty = if n.sig.params.len() == 1 {
         let t = ast_type_to_ty(&n.sig.params[0].ty, aliases);
-        env.insert(n.sig.params[0].name.as_str().to_string(), Scheme::mono(t.clone()));
+        env.insert(
+            n.sig.params[0].name.as_str().to_string(),
+            Scheme::mono(t.clone()),
+        );
         env.insert("in".into(), Scheme::mono(t.clone()));
         t
     } else {
@@ -133,7 +158,10 @@ fn check_node(
     for p in &n.pre {
         let ty = match infer(p, &env, &mut subst, &mut gen, types) {
             Ok(t) => t,
-            Err(e) => { errs.push(e); continue; }
+            Err(e) => {
+                errs.push(e);
+                continue;
+            }
         };
         match unify(&ty, &Ty::Base("Bool".into())) {
             Ok(s) => subst = s.compose(&subst),
@@ -147,7 +175,10 @@ fn check_node(
     for p in &n.post {
         let ty = match infer(p, &env, &mut subst, &mut gen, types) {
             Ok(t) => t,
-            Err(e) => { errs.push(e); continue; }
+            Err(e) => {
+                errs.push(e);
+                continue;
+            }
         };
         match unify(&ty, &Ty::Base("Bool".into())) {
             Ok(s) => subst = s.compose(&subst),
@@ -159,7 +190,11 @@ fn check_node(
         }
     }
 
-    if errs.is_empty() { Ok(()) } else { Err(errs) }
+    if errs.is_empty() {
+        Ok(())
+    } else {
+        Err(errs)
+    }
 }
 
 fn check_graph(
@@ -177,7 +212,13 @@ fn check_graph(
     let in_ty = if g.sig.params.len() == 1 {
         ast_type_to_ty(&g.sig.params[0].ty, aliases)
     } else {
-        Ty::Tuple(g.sig.params.iter().map(|p| ast_type_to_ty(&p.ty, aliases)).collect())
+        Ty::Tuple(
+            g.sig
+                .params
+                .iter()
+                .map(|p| ast_type_to_ty(&p.ty, aliases))
+                .collect(),
+        )
     };
     let out_ty = ast_type_to_ty(&g.sig.ret, aliases);
     env.insert("in".into(), Scheme::mono(in_ty.clone()));
@@ -188,7 +229,10 @@ fn check_graph(
     for p in &g.post {
         let ty = match infer(p, &env, &mut subst, &mut gen, types) {
             Ok(t) => t,
-            Err(e) => { errs.push(e); continue; }
+            Err(e) => {
+                errs.push(e);
+                continue;
+            }
         };
         match unify(&ty, &Ty::Base("Bool".into())) {
             Ok(s) => subst = s.compose(&subst),
@@ -205,7 +249,9 @@ fn check_graph(
         for step in chain {
             if step.nodes.len() == 1 {
                 let name = step.nodes[0].as_str();
-                if name == "in" || name == "out" { continue; }
+                if name == "in" || name == "out" {
+                    continue;
+                }
                 if let Some(scheme) = env.get(name).cloned() {
                     if let Ty::Fun(_, ret) = instantiate(&scheme, &mut gen) {
                         node_outputs.insert(name.to_string(), *ret);
@@ -216,12 +262,21 @@ fn check_graph(
     }
 
     for chain in &g.flow {
-        if chain.is_empty() { continue; }
+        if chain.is_empty() {
+            continue;
+        }
         let mut cur: Option<Ty> = None;
         let mut prev_name = String::new();
         for step in chain {
-            let step_label = step.nodes.iter().map(|n| n.as_str()).collect::<Vec<_>>().join(",");
-            let (expected_input, position_output): (Option<Ty>, Option<Ty>) = if step.nodes.len() == 1 {
+            let step_label = step
+                .nodes
+                .iter()
+                .map(|n| n.as_str())
+                .collect::<Vec<_>>()
+                .join(",");
+            let (expected_input, position_output): (Option<Ty>, Option<Ty>) = if step.nodes.len()
+                == 1
+            {
                 let name = step.nodes[0].as_str();
                 if name == "in" {
                     (None, Some(in_ty.clone()))
@@ -236,22 +291,31 @@ fn check_graph(
                                 span: step.span.clone(),
                                 kind: TypeErrorKind::UnknownName(name.to_string()),
                             });
-                            cur = None; continue;
+                            cur = None;
+                            continue;
                         }
                     };
                     match instantiate(&scheme, &mut gen) {
                         Ty::Fun(args, ret) => {
-                            let input = if args.len() == 1 { args.into_iter().next().unwrap() }
-                                else { Ty::Tuple(args) };
+                            let input = if args.len() == 1 {
+                                args.into_iter().next().unwrap()
+                            } else {
+                                Ty::Tuple(args)
+                            };
                             (Some(input), Some(*ret))
                         }
                         other => {
                             errs.push(TypeError {
                                 msg: format!("flow step `{}` is not a function: {}", name, other),
                                 span: step.span.clone(),
-                                kind: TypeErrorKind::Arity { name: name.into(), expected: 1, found: 0 },
+                                kind: TypeErrorKind::Arity {
+                                    name: name.into(),
+                                    expected: 1,
+                                    found: 0,
+                                },
                             });
-                            cur = None; continue;
+                            cur = None;
+                            continue;
                         }
                     }
                 }
@@ -260,8 +324,14 @@ fn check_graph(
                 let mut ok = true;
                 for n in &step.nodes {
                     let nm = n.as_str();
-                    if nm == "in" { outs.push(in_ty.clone()); continue; }
-                    if nm == "out" { outs.push(out_ty.clone()); continue; }
+                    if nm == "in" {
+                        outs.push(in_ty.clone());
+                        continue;
+                    }
+                    if nm == "out" {
+                        outs.push(out_ty.clone());
+                        continue;
+                    }
                     if let Some(ty) = node_outputs.get(nm).cloned() {
                         outs.push(ty);
                         continue;
@@ -271,11 +341,19 @@ fn check_graph(
                             Ty::Fun(_, ret) => outs.push(*ret),
                             other => {
                                 errs.push(TypeError {
-                                    msg: format!("flow tuple source `{}` is not a function: {}", nm, other),
+                                    msg: format!(
+                                        "flow tuple source `{}` is not a function: {}",
+                                        nm, other
+                                    ),
                                     span: step.span.clone(),
-                                    kind: TypeErrorKind::Arity { name: nm.into(), expected: 0, found: 0 },
+                                    kind: TypeErrorKind::Arity {
+                                        name: nm.into(),
+                                        expected: 0,
+                                        found: 0,
+                                    },
                                 });
-                                ok = false; break;
+                                ok = false;
+                                break;
                             }
                         },
                         None => {
@@ -284,11 +362,15 @@ fn check_graph(
                                 span: step.span.clone(),
                                 kind: TypeErrorKind::UnknownName(nm.into()),
                             });
-                            ok = false; break;
+                            ok = false;
+                            break;
                         }
                     }
                 }
-                if !ok { cur = None; continue; }
+                if !ok {
+                    cur = None;
+                    continue;
+                }
                 let flattened = flatten_world_tuple(&outs);
                 (None, Some(flattened))
             };
@@ -303,8 +385,8 @@ fn check_graph(
                         kind: TypeErrorKind::FlowMismatch {
                             left: prev_name.clone(),
                             right: step_label.clone(),
-                            want: expected.clone(),
-                            got: c.clone(),
+                            want: Box::new(expected.clone()),
+                            got: Box::new(c.clone()),
                         },
                     });
                 } else {
@@ -317,7 +399,11 @@ fn check_graph(
         }
     }
 
-    if errs.is_empty() { Ok(()) } else { Err(errs) }
+    if errs.is_empty() {
+        Ok(())
+    } else {
+        Err(errs)
+    }
 }
 
 fn infer(
@@ -332,11 +418,13 @@ fn infer(
         Expr::Lit(l, _) => lit_ty(l),
         Expr::Var(id, _) => match env.get(id.as_str()) {
             Some(s) => instantiate(s, gen),
-            None => return Err(TypeError {
-                msg: format!("unknown name `{}`", id),
-                span: span.clone(),
-                kind: TypeErrorKind::UnknownName(id.as_str().to_string()),
-            }),
+            None => {
+                return Err(TypeError {
+                    msg: format!("unknown name `{}`", id),
+                    span: span.clone(),
+                    kind: TypeErrorKind::UnknownName(id.as_str().to_string()),
+                })
+            }
         },
         Expr::Field(inner, field, _) => {
             let t = infer(inner, env, subst, gen, types)?;
@@ -345,50 +433,72 @@ fn infer(
                 Ty::Tuple(elts) => {
                     let f = field.as_str();
                     if let Ok(i) = f.parse::<usize>() {
-                        if i < elts.len() { elts[i].clone() }
-                        else {
+                        if i < elts.len() {
+                            elts[i].clone()
+                        } else {
                             return Err(TypeError {
                                 msg: format!("tuple index {} out of range for {}", i, t),
                                 span: span.clone(),
-                                kind: TypeErrorKind::BadIndex { ty: t.clone(), index: f.to_string() },
+                                kind: TypeErrorKind::BadIndex {
+                                    ty: t.clone(),
+                                    index: f.to_string(),
+                                },
                             });
                         }
                     } else {
                         return Err(TypeError {
                             msg: format!("named field access `{}` not supported on tuple", f),
                             span: span.clone(),
-                            kind: TypeErrorKind::BadIndex { ty: t.clone(), index: f.to_string() },
+                            kind: TypeErrorKind::BadIndex {
+                                ty: t.clone(),
+                                index: f.to_string(),
+                            },
                         });
                     }
                 }
-                _ => return Err(TypeError {
-                    msg: format!("field access on non-tuple value of type {}", t),
-                    span: span.clone(),
-                    kind: TypeErrorKind::NotATuple(t),
-                }),
+                _ => {
+                    return Err(TypeError {
+                        msg: format!("field access on non-tuple value of type {}", t),
+                        span: span.clone(),
+                        kind: TypeErrorKind::NotATuple(t),
+                    })
+                }
             }
         }
         Expr::Apply(name, args, _) => {
             let scheme = match env.get(name.as_str()) {
                 Some(s) => s.clone(),
-                None => return Err(TypeError {
-                    msg: format!("unknown function `{}`", name),
-                    span: span.clone(),
-                    kind: TypeErrorKind::UnknownName(name.as_str().to_string()),
-                }),
+                None => {
+                    return Err(TypeError {
+                        msg: format!("unknown function `{}`", name),
+                        span: span.clone(),
+                        kind: TypeErrorKind::UnknownName(name.as_str().to_string()),
+                    })
+                }
             };
             let inst = instantiate(&scheme, gen);
             let (f_args, f_ret) = match inst {
                 Ty::Fun(a, r) => (a, *r),
-                other => return Err(TypeError {
-                    msg: format!("`{}` is not a function: {}", name, other),
-                    span: span.clone(),
-                    kind: TypeErrorKind::Arity { name: name.as_str().to_string(), expected: args.len(), found: 0 },
-                }),
+                other => {
+                    return Err(TypeError {
+                        msg: format!("`{}` is not a function: {}", name, other),
+                        span: span.clone(),
+                        kind: TypeErrorKind::Arity {
+                            name: name.as_str().to_string(),
+                            expected: args.len(),
+                            found: 0,
+                        },
+                    })
+                }
             };
             if f_args.len() != args.len() {
                 return Err(TypeError {
-                    msg: format!("`{}` expects {} args, got {}", name, f_args.len(), args.len()),
+                    msg: format!(
+                        "`{}` expects {} args, got {}",
+                        name,
+                        f_args.len(),
+                        args.len()
+                    ),
                     span: span.clone(),
                     kind: TypeErrorKind::Arity {
                         name: name.as_str().to_string(),
@@ -405,7 +515,11 @@ fn infer(
                         if let Ty::Fun(lam_args, lam_ret) = &expected {
                             if params.len() != lam_args.len() {
                                 return Err(TypeError {
-                                    msg: format!("lambda arity {} does not match expected {}", params.len(), lam_args.len()),
+                                    msg: format!(
+                                        "lambda arity {} does not match expected {}",
+                                        params.len(),
+                                        lam_args.len()
+                                    ),
                                     span: a.span(),
                                     kind: TypeErrorKind::Arity {
                                         name: format!("lambda for {}", name),
@@ -419,7 +533,11 @@ fn infer(
                                 inner.insert(pname.as_str().to_string(), Scheme::mono(pty.clone()));
                             }
                             let body_ty = infer(body, &inner, subst, gen, types)?;
-                            let s = unify_or_err(&subst.apply(&body_ty), &subst.apply(lam_ret), a.span())?;
+                            let s = unify_or_err(
+                                &subst.apply(&body_ty),
+                                &subst.apply(lam_ret),
+                                a.span(),
+                            )?;
                             *subst = s.compose(subst);
                             continue;
                         }
@@ -488,8 +606,8 @@ fn infer(
                 }
             }
         }
-        Expr::Quant(Quant::Forall, x, dom, body, _) |
-        Expr::Quant(Quant::Exists, x, dom, body, _) => {
+        Expr::Quant(Quant::Forall, x, dom, body, _)
+        | Expr::Quant(Quant::Exists, x, dom, body, _) => {
             let dt = infer(dom, env, subst, gen, types)?;
             let dt = subst.apply(&dt);
             let elem = match dt {
@@ -501,11 +619,13 @@ fn infer(
                     *subst = s.compose(subst);
                     elem
                 }
-                other => return Err(TypeError {
-                    msg: format!("quantifier domain must be a list, got {}", other),
-                    span: dom.span(),
-                    kind: TypeErrorKind::NotPredicate(other),
-                }),
+                other => {
+                    return Err(TypeError {
+                        msg: format!("quantifier domain must be a list, got {}", other),
+                        span: dom.span(),
+                        kind: TypeErrorKind::NotPredicate(other),
+                    })
+                }
             };
             let mut inner = env.clone();
             inner.insert(x.as_str().to_string(), Scheme::mono(elem));
@@ -532,7 +652,9 @@ fn infer(
         }
         Expr::Tuple(es, _) => {
             let mut ts = Vec::with_capacity(es.len());
-            for e in es { ts.push(infer(e, env, subst, gen, types)?); }
+            for e in es {
+                ts.push(infer(e, env, subst, gen, types)?);
+            }
             Ty::Tuple(ts)
         }
         Expr::Lam(params, body, _) => {
@@ -565,7 +687,7 @@ fn unify_or_err(a: &Ty, b: &Ty, span: Span) -> Result<Subst, TypeError> {
     unify(a, b).map_err(|e| TypeError {
         msg: format!("type mismatch: {}", e),
         span,
-        kind: TypeErrorKind::Unify(e),
+        kind: TypeErrorKind::Unify(Box::new(e)),
     })
 }
 
@@ -574,21 +696,37 @@ mod tests {
     use super::*;
     use apsl_core::ast::*;
 
-    fn mk_node(name: &str, in_ty: AstType, ret: AstType, pre: Vec<Expr>, post: Vec<Expr>) -> Node {
-        Node {
+    fn mk_node(
+        name: &str,
+        in_ty: AstType,
+        ret: AstType,
+        pre: Vec<Expr>,
+        post: Vec<Expr>,
+    ) -> Box<Node> {
+        Box::new(Node {
             name: Ident::new(name),
             sig: TypeSig {
-                params: vec![Param { name: Ident::new("in"), ty: in_ty }],
+                params: vec![Param {
+                    name: Ident::new("in"),
+                    ty: in_ty,
+                }],
                 ret,
             },
-            pre, post,
-            cx: CxSpec { bigo: CxExpr::Const, class: RuntimeClass::Idem },
-            sla: None, via: None,
-            auth: AuthLevel::None, scope_constraint: ScopeConstraint::Any, audit_req: AuditReq::None,
+            pre,
+            post,
+            cx: CxSpec {
+                bigo: CxExpr::Const,
+                class: RuntimeClass::Idem,
+            },
+            sla: None,
+            via: None,
+            auth: AuthLevel::None,
+            scope_constraint: ScopeConstraint::Any,
+            audit_req: AuditReq::None,
             state: vec![],
             deploy: None,
             span: Span::NONE,
-        }
+        })
     }
 
     #[test]
@@ -699,7 +837,9 @@ mod tests {
             post,
         )));
         let errs = type_check(&p).unwrap_err();
-        assert!(errs.iter().any(|e| matches!(e.kind, TypeErrorKind::UnknownName(_))));
+        assert!(errs
+            .iter()
+            .any(|e| matches!(e.kind, TypeErrorKind::UnknownName(_))));
     }
 }
 
@@ -707,10 +847,10 @@ fn flatten_world_tuple(outs: &[Ty]) -> Ty {
     let mut flat: Vec<Ty> = Vec::new();
     for t in outs {
         match t {
-            Ty::Tuple(inner) if !inner.is_empty() => {
+            Ty::Tuple(inner) if inner.first().is_some_and(is_world_type) => {
                 for (i, e) in inner.iter().enumerate() {
                     if i == 0 && is_world_type(e) {
-                        if !flat.iter().any(|x| is_world_type(x)) {
+                        if !flat.iter().any(is_world_type) {
                             flat.push(e.clone());
                         }
                     } else {
@@ -721,9 +861,42 @@ fn flatten_world_tuple(outs: &[Ty]) -> Ty {
             _ => flat.push(t.clone()),
         }
     }
-    if flat.len() == 1 { flat.remove(0) } else { Ty::Tuple(flat) }
+    if flat.len() == 1 {
+        flat.remove(0)
+    } else {
+        Ty::Tuple(flat)
+    }
 }
 
 fn is_world_type(t: &Ty) -> bool {
     matches!(t, Ty::Base(n) if n == "World") || matches!(t, Ty::Parameterized(n, _) if n == "World")
+}
+
+#[cfg(test)]
+mod fan_in_tests {
+    use super::*;
+
+    fn base(name: &str) -> Ty {
+        Ty::Base(name.to_string())
+    }
+
+    #[test]
+    fn ordinary_tuple_outputs_remain_nested() {
+        let left = Ty::Tuple(vec![base("A"), base("B")]);
+        let right = Ty::Tuple(vec![base("C"), base("D")]);
+        assert_eq!(
+            flatten_world_tuple(&[left.clone(), right.clone()]),
+            Ty::Tuple(vec![left, right])
+        );
+    }
+
+    #[test]
+    fn world_outputs_share_one_world_and_flatten_payloads() {
+        let left = Ty::Tuple(vec![base("World"), base("A")]);
+        let right = Ty::Tuple(vec![base("World"), base("B")]);
+        assert_eq!(
+            flatten_world_tuple(&[left, right]),
+            Ty::Tuple(vec![base("World"), base("A"), base("B")])
+        );
+    }
 }

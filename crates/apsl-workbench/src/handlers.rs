@@ -1,4 +1,3 @@
-
 use std::sync::Arc;
 
 use axum::extract::State;
@@ -19,7 +18,7 @@ pub async fn healthz() -> Json<Value> {
     Json(json!({
         "status": "ok",
         "service": "apsl-workbench",
-        "specified_by": "workbench.apsl"
+        "specified_by": "apsl.apsl"
     }))
 }
 
@@ -34,10 +33,7 @@ fn compile_err_response(e: &CompileError) -> (StatusCode, Json<Value>) {
     )
 }
 
-pub async fn compile(
-    State(st): State<Arc<AppState>>,
-    body: String,
-) -> (StatusCode, Json<Value>) {
+pub async fn compile(State(st): State<Arc<AppState>>, body: String) -> (StatusCode, Json<Value>) {
     match pipeline::compile(&body, &st.store_base, &st.key, &|_| None) {
         Ok(certs) => (
             StatusCode::OK,
@@ -141,11 +137,9 @@ pub fn jacobian_verify(
         let Decl::Node(n) = d else { continue };
         let name = n.name.as_str().to_string();
 
-        let in_arity = n
-            .sig
-            .params
-            .iter()
-            .try_fold(0usize, |acc, p| numeric_arity(&p.ty, &aliases, 0).map(|k| acc + k));
+        let in_arity = n.sig.params.iter().try_fold(0usize, |acc, p| {
+            numeric_arity(&p.ty, &aliases, 0).map(|k| acc + k)
+        });
         let out_arity = numeric_arity(&n.sig.ret, &aliases, 0);
 
         let (Some(in_n), Some(out_n)) = (in_arity, out_arity) else {
@@ -181,10 +175,7 @@ pub fn jacobian_verify(
     out
 }
 
-pub async fn build(
-    State(st): State<Arc<AppState>>,
-    raw: String,
-) -> (StatusCode, Json<Value>) {
+pub async fn build(State(st): State<Arc<AppState>>, raw: String) -> (StatusCode, Json<Value>) {
     let (body, boxes) = parse_build_body(&raw);
     let nodes = match pipeline::node_names(&body) {
         Ok(n) => n,
@@ -223,8 +214,7 @@ pub async fn build(
         .collect();
 
     let integrated = cert_json.iter().all(|c| {
-        c["in_closure"].as_bool().unwrap_or(false)
-            && !c["impl"].as_str().unwrap_or("").is_empty()
+        c["in_closure"].as_bool().unwrap_or(false) && !c["impl"].as_str().unwrap_or("").is_empty()
     });
 
     let jacobian = jacobian_verify(&body, &built.manifest, &boxes);
@@ -245,29 +235,39 @@ pub async fn build(
 
 #[derive(Deserialize)]
 pub struct VerifyReq {
-    pub apsl: Option<String>,
     pub node: Option<String>,
     pub pre: Vec<[f64; 2]>,
     pub post: Vec<[f64; 2]>,
 }
 
 pub async fn verify(Json(req): Json<VerifyReq>) -> (StatusCode, Json<Value>) {
-    if req.pre.is_empty() || req.post.is_empty() {
+    let valid_box = |bounds: &[[f64; 2]]| {
+        bounds
+            .iter()
+            .all(|[lower, upper]| lower.is_finite() && upper.is_finite() && lower <= upper)
+    };
+    if req.pre.is_empty()
+        || req.post.is_empty()
+        || req.pre.len() != req.post.len()
+        || !valid_box(&req.pre)
+        || !valid_box(&req.post)
+    {
         return (
             StatusCode::UNPROCESSABLE_ENTITY,
-            Json(json!({"ok": false, "error": "pre and post boxes required"})),
+            Json(json!({
+                "ok": false,
+                "error": "pre and post boxes must be nonempty, finite, ordered, and have equal arity"
+            })),
         );
     }
     let pre: Vec<(f64, f64)> = req.pre.iter().map(|b| (b[0], b[1])).collect();
     let post_box = req.post.clone();
 
     let post = move |y: &[f64]| -> bool {
-        y.iter().enumerate().all(|(i, &v)| {
-            post_box
-                .get(i)
-                .map(|b| v >= b[0] && v <= b[1])
-                .unwrap_or(true)
-        })
+        y.len() == post_box.len()
+            && y.iter()
+                .zip(&post_box)
+                .all(|(&value, bounds)| value >= bounds[0] && value <= bounds[1])
     };
     let f = |x: &[f64]| x.to_vec();
 
@@ -277,7 +277,6 @@ pub async fn verify(Json(req): Json<VerifyReq>) -> (StatusCode, Json<Value>) {
         Json(json!({
             "ok": true,
             "node": req.node,
-            "specified_by": req.apsl.is_some().then_some("jacobian-solver.apsl"),
             "verdict": {
                 "satisfies": v.satisfies,
                 "witness": v.witness,

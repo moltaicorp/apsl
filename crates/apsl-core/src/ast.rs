@@ -1,16 +1,21 @@
-
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Ident(pub String);
 
 impl Ident {
-    pub fn new(s: impl Into<String>) -> Self { Self(s.into()) }
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn new(s: impl Into<String>) -> Self {
+        Self(s.into())
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl fmt::Display for Ident {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(&self.0) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -21,15 +26,17 @@ pub struct Span {
 }
 
 impl Span {
-    pub const NONE: Span = Span { line: 0, col: 0, len: 0 };
+    pub const NONE: Span = Span {
+        line: 0,
+        col: 0,
+        len: 0,
+    };
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Type {
     Base(Ident),
-   
-   
+
     Parameterized(Ident, Vec<Type>),
     Record(Vec<(Ident, Box<Type>)>),
     List(Box<Type>),
@@ -50,7 +57,6 @@ pub struct TypeSig {
     pub ret: Type,
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Lit {
     Int(i128),
@@ -61,17 +67,35 @@ pub enum Lit {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BinOp {
-    Eq, Ne, Lt, Le, Gt, Ge,
-    Add, Sub, Mul, Div, Mod,
-    And, Or,
-    Subset, Union, Intersect,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    And,
+    Or,
+    Subset,
+    Union,
+    Intersect,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum UnOp { Not, Neg }
+pub enum UnOp {
+    Not,
+    Neg,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Quant { Forall, Exists }
+pub enum Quant {
+    Forall,
+    Exists,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
@@ -91,14 +115,20 @@ pub enum Expr {
 impl Expr {
     pub fn span(&self) -> Span {
         match self {
-            Expr::Lit(_, s) | Expr::Var(_, s) | Expr::Field(_, _, s)
-            | Expr::Apply(_, _, s) | Expr::Bin(_, _, _, s) | Expr::Un(_, _, s)
-            | Expr::Quant(_, _, _, _, s) | Expr::If(_, _, _, s)
-            | Expr::Let(_, _, _, s) | Expr::Tuple(_, s) | Expr::Lam(_, _, s) => s.clone(),
+            Expr::Lit(_, s)
+            | Expr::Var(_, s)
+            | Expr::Field(_, _, s)
+            | Expr::Apply(_, _, s)
+            | Expr::Bin(_, _, _, s)
+            | Expr::Un(_, _, s)
+            | Expr::Quant(_, _, _, _, s)
+            | Expr::If(_, _, _, s)
+            | Expr::Let(_, _, _, s)
+            | Expr::Tuple(_, s)
+            | Expr::Lam(_, _, s) => s.clone(),
         }
     }
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum AuthLevel {
@@ -124,7 +154,11 @@ pub enum AuditReq {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum RuntimeClass { Idem, IdemComplex, AntiIdem }
+pub enum RuntimeClass {
+    Idem,
+    IdemComplex,
+    AntiIdem,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CxSpec {
@@ -160,7 +194,6 @@ pub struct Via {
     pub tag: Ident,
     pub attrs: Vec<(Ident, Ident)>,
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TypeAlias {
@@ -234,7 +267,10 @@ pub struct FlowStep {
 
 impl FlowStep {
     pub fn single(node: Ident, span: Span) -> Self {
-        Self { nodes: vec![node], span }
+        Self {
+            nodes: vec![node],
+            span,
+        }
     }
 }
 
@@ -251,7 +287,7 @@ pub struct Graph {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Decl {
     Type(TypeAlias),
-    Node(Node),
+    Node(Box<Node>),
     Graph(Graph),
 }
 
@@ -261,5 +297,7 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 }

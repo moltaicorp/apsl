@@ -1,4 +1,3 @@
-
 use apsl_core::ast::Span;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -54,7 +53,11 @@ pub struct LexError {
 
 impl std::fmt::Display for LexError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "lex error at line {} col {}: {}", self.span.line, self.span.col, self.msg)
+        write!(
+            f,
+            "lex error at line {} col {}: {}",
+            self.span.line, self.span.col, self.msg
+        )
     }
 }
 
@@ -72,13 +75,21 @@ pub fn lex(src: &str) -> Result<Vec<Tok>, LexError> {
             let mut indent = 0usize;
             let line_start_col = 1u32;
             while let Some(&c2) = chars.peek() {
-                if c2 == ' ' { chars.next(); indent += 1; }
-                else if c2 == '\t' {
+                if c2 == ' ' {
+                    chars.next();
+                    indent += 1;
+                } else if c2 == '\t' {
                     return Err(LexError {
                         msg: "tab in indentation; APSL requires spaces only".into(),
-                        span: Span { line, col: line_start_col, len: 1 },
+                        span: Span {
+                            line,
+                            col: line_start_col,
+                            len: 1,
+                        },
                     });
-                } else { break; }
+                } else {
+                    break;
+                }
             }
             col = (indent + 1) as u32;
             if let Some(&c3) = chars.peek() {
@@ -89,17 +100,35 @@ pub fn lex(src: &str) -> Result<Vec<Tok>, LexError> {
                     match indent.cmp(&top) {
                         Greater => {
                             indent_stack.push(indent);
-                            out.push(Tok { kind: TokKind::Indent, span: Span { line, col: line_start_col, len: 0 } });
+                            out.push(Tok {
+                                kind: TokKind::Indent,
+                                span: Span {
+                                    line,
+                                    col: line_start_col,
+                                    len: 0,
+                                },
+                            });
                         }
                         Less => {
                             while *indent_stack.last().unwrap() > indent {
                                 indent_stack.pop();
-                                out.push(Tok { kind: TokKind::Dedent, span: Span { line, col: line_start_col, len: 0 } });
+                                out.push(Tok {
+                                    kind: TokKind::Dedent,
+                                    span: Span {
+                                        line,
+                                        col: line_start_col,
+                                        len: 0,
+                                    },
+                                });
                             }
                             if *indent_stack.last().unwrap() != indent {
                                 return Err(LexError {
                                     msg: format!("inconsistent indentation: {}", indent),
-                                    span: Span { line, col: line_start_col, len: 0 },
+                                    span: Span {
+                                        line,
+                                        col: line_start_col,
+                                        len: 0,
+                                    },
                                 });
                             }
                         }
@@ -112,84 +141,149 @@ pub fn lex(src: &str) -> Result<Vec<Tok>, LexError> {
         }
 
         match c {
-            ' ' | '\t' => { chars.next(); col += 1; }
+            ' ' | '\t' => {
+                chars.next();
+                col += 1;
+            }
             '\n' => {
                 chars.next();
                 if paren_depth == 0 {
-                    let prev_is_separator = out.last()
-                        .map(|t| matches!(t.kind, TokKind::Newline | TokKind::Indent | TokKind::Dedent))
+                    let prev_is_separator = out
+                        .last()
+                        .map(|t| {
+                            matches!(t.kind, TokKind::Newline | TokKind::Indent | TokKind::Dedent)
+                        })
                         .unwrap_or(true);
                     if !prev_is_separator {
-                        out.push(Tok { kind: TokKind::Newline, span: Span { line, col, len: 1 } });
+                        out.push(Tok {
+                            kind: TokKind::Newline,
+                            span: Span { line, col, len: 1 },
+                        });
                     }
                 }
                 line += 1;
                 col = 1;
                 at_line_start = true;
             }
-            '\r' => { chars.next(); }
+            '\r' => {
+                chars.next();
+            }
             '#' => {
                 while let Some(&c2) = chars.peek() {
-                    if c2 == '\n' { break; }
+                    if c2 == '\n' {
+                        break;
+                    }
                     chars.next();
                 }
             }
             '"' => {
                 let start = Span { line, col, len: 0 };
-                chars.next(); col += 1;
+                chars.next();
+                col += 1;
                 let mut s = String::new();
                 while let Some(&c2) = chars.peek() {
-                    if c2 == '"' { chars.next(); col += 1; break; }
+                    if c2 == '"' {
+                        chars.next();
+                        col += 1;
+                        break;
+                    }
                     if c2 == '\\' {
-                        chars.next(); col += 1;
+                        chars.next();
+                        col += 1;
                         match chars.next() {
-                            Some('"') => { s.push('"'); col += 1; }
-                            Some('\\') => { s.push('\\'); col += 1; }
-                            Some('n') => { s.push('\n'); col += 1; }
-                            Some('r') => { s.push('\r'); col += 1; }
-                            Some('t') => { s.push('\t'); col += 1; }
-                            Some(other) => { s.push(other); col += 1; }
-                            None => return Err(LexError {
-                                msg: "unterminated string".into(),
-                                span: start,
-                            }),
+                            Some('"') => {
+                                s.push('"');
+                                col += 1;
+                            }
+                            Some('\\') => {
+                                s.push('\\');
+                                col += 1;
+                            }
+                            Some('n') => {
+                                s.push('\n');
+                                col += 1;
+                            }
+                            Some('r') => {
+                                s.push('\r');
+                                col += 1;
+                            }
+                            Some('t') => {
+                                s.push('\t');
+                                col += 1;
+                            }
+                            Some(other) => {
+                                s.push(other);
+                                col += 1;
+                            }
+                            None => {
+                                return Err(LexError {
+                                    msg: "unterminated string".into(),
+                                    span: start,
+                                })
+                            }
                         }
                     } else {
                         s.push(c2);
-                        chars.next(); col += 1;
+                        chars.next();
+                        col += 1;
                     }
                 }
-                out.push(Tok { kind: TokKind::StrLit(s), span: start });
+                out.push(Tok {
+                    kind: TokKind::StrLit(s),
+                    span: start,
+                });
             }
             c if c.is_ascii_digit() => {
                 let start = Span { line, col, len: 0 };
                 let mut buf = String::new();
                 while let Some(&c2) = chars.peek() {
-                    if c2.is_ascii_digit() { buf.push(c2); chars.next(); col += 1; }
-                    else { break; }
+                    if c2.is_ascii_digit() {
+                        buf.push(c2);
+                        chars.next();
+                        col += 1;
+                    } else {
+                        break;
+                    }
                 }
-                let prev_is_dot = out.last().map(|t| matches!(t.kind, TokKind::Dot)).unwrap_or(false);
-                if !prev_is_dot {
-                    if chars.peek() == Some(&'.') {
-                        let mut clone = chars.clone();
-                        clone.next();
-                        if clone.peek().map(|c| c.is_ascii_digit()).unwrap_or(false) {
-                            buf.push('.'); chars.next(); col += 1;
-                            while let Some(&c2) = chars.peek() {
-                                if c2.is_ascii_digit() { buf.push(c2); chars.next(); col += 1; }
-                                else { break; }
+                let prev_is_dot = out
+                    .last()
+                    .map(|t| matches!(t.kind, TokKind::Dot))
+                    .unwrap_or(false);
+                if !prev_is_dot && chars.peek() == Some(&'.') {
+                    let mut clone = chars.clone();
+                    clone.next();
+                    if clone.peek().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                        buf.push('.');
+                        chars.next();
+                        col += 1;
+                        while let Some(&c2) = chars.peek() {
+                            if c2.is_ascii_digit() {
+                                buf.push(c2);
+                                chars.next();
+                                col += 1;
+                            } else {
+                                break;
                             }
                         }
                     }
                 }
                 if chars.peek() == Some(&'e') || chars.peek() == Some(&'E') {
-                    buf.push('e'); chars.next(); col += 1;
+                    buf.push('e');
+                    chars.next();
+                    col += 1;
                     if chars.peek() == Some(&'-') || chars.peek() == Some(&'+') {
-                        buf.push(*chars.peek().unwrap()); chars.next(); col += 1;
+                        buf.push(*chars.peek().unwrap());
+                        chars.next();
+                        col += 1;
                     }
                     while let Some(&c2) = chars.peek() {
-                        if c2.is_ascii_digit() { buf.push(c2); chars.next(); col += 1; }
-                        else { break; }
+                        if c2.is_ascii_digit() {
+                            buf.push(c2);
+                            chars.next();
+                            col += 1;
+                        } else {
+                            break;
+                        }
                     }
                 }
                 let kind = if buf.contains('.') || buf.contains('e') {
@@ -210,16 +304,27 @@ pub fn lex(src: &str) -> Result<Vec<Tok>, LexError> {
             c if is_ident_start(c) => {
                 let start = Span { line, col, len: 0 };
                 let mut buf = String::new();
-                buf.push(c); chars.next(); col += 1;
+                buf.push(c);
+                chars.next();
+                col += 1;
                 while let Some(&c2) = chars.peek() {
-                    if is_ident_continue(c2) { buf.push(c2); chars.next(); col += 1; }
-                    else { break; }
+                    if is_ident_continue(c2) {
+                        buf.push(c2);
+                        chars.next();
+                        col += 1;
+                    } else {
+                        break;
+                    }
                 }
                 if let Some(&c2) = chars.peek() {
-                    if c2 == '?' || c2 == '!' { buf.push(c2); chars.next(); col += 1; }
+                    if c2 == '?' || c2 == '!' {
+                        buf.push(c2);
+                        chars.next();
+                        col += 1;
+                    }
                 }
                 let kind = match buf.as_str() {
-                    "true"  => TokKind::BoolLit(true),
+                    "true" => TokKind::BoolLit(true),
                     "false" => TokKind::BoolLit(false),
                     _ if buf.chars().next().unwrap().is_ascii_uppercase() => TokKind::TypeName(buf),
                     _ => TokKind::Ident(buf),
@@ -228,97 +333,359 @@ pub fn lex(src: &str) -> Result<Vec<Tok>, LexError> {
             }
             _ => {
                 let start = Span { line, col, len: 0 };
-                let mut consume_one = || { chars.next(); col += 1; };
+                let mut consume_one = || {
+                    chars.next();
+                    col += 1;
+                };
                 match c {
-                    ':' => { consume_one(); out.push(Tok { kind: TokKind::Colon, span: start }); }
-                    '(' => { consume_one(); paren_depth += 1; out.push(Tok { kind: TokKind::LParen, span: start }); }
-                    ')' => { consume_one(); paren_depth -= 1; out.push(Tok { kind: TokKind::RParen, span: start }); }
+                    ':' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Colon,
+                            span: start,
+                        });
+                    }
+                    '(' => {
+                        consume_one();
+                        paren_depth += 1;
+                        out.push(Tok {
+                            kind: TokKind::LParen,
+                            span: start,
+                        });
+                    }
+                    ')' => {
+                        consume_one();
+                        paren_depth -= 1;
+                        out.push(Tok {
+                            kind: TokKind::RParen,
+                            span: start,
+                        });
+                    }
                     '[' => {
                         consume_one();
                         if chars.peek() == Some(&']') {
-                            chars.next(); col += 1;
-                            out.push(Tok { kind: TokKind::BracketPair, span: start });
+                            chars.next();
+                            col += 1;
+                            out.push(Tok {
+                                kind: TokKind::BracketPair,
+                                span: start,
+                            });
                         } else {
-                            out.push(Tok { kind: TokKind::LBracket, span: start });
+                            out.push(Tok {
+                                kind: TokKind::LBracket,
+                                span: start,
+                            });
                         }
                     }
-                    ']' => { consume_one(); out.push(Tok { kind: TokKind::RBracket, span: start }); }
-                    '{' => { consume_one(); out.push(Tok { kind: TokKind::LBrace, span: start }); }
-                    '}' => { consume_one(); out.push(Tok { kind: TokKind::RBrace, span: start }); }
-                    ',' => { consume_one(); out.push(Tok { kind: TokKind::Comma, span: start }); }
-                    '.' => { consume_one(); out.push(Tok { kind: TokKind::Dot, span: start }); }
-                    ';' => { consume_one(); out.push(Tok { kind: TokKind::Semi, span: start }); }
-                    '@' => { consume_one(); out.push(Tok { kind: TokKind::At, span: start }); }
-                    '+' => { consume_one(); out.push(Tok { kind: TokKind::Plus, span: start }); }
-                    '*' => { consume_one(); out.push(Tok { kind: TokKind::Star, span: start }); }
-                    '/' => { consume_one(); out.push(Tok { kind: TokKind::Slash, span: start }); }
+                    ']' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::RBracket,
+                            span: start,
+                        });
+                    }
+                    '{' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::LBrace,
+                            span: start,
+                        });
+                    }
+                    '}' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::RBrace,
+                            span: start,
+                        });
+                    }
+                    ',' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Comma,
+                            span: start,
+                        });
+                    }
+                    '.' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Dot,
+                            span: start,
+                        });
+                    }
+                    ';' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Semi,
+                            span: start,
+                        });
+                    }
+                    '@' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::At,
+                            span: start,
+                        });
+                    }
+                    '+' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Plus,
+                            span: start,
+                        });
+                    }
+                    '*' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Star,
+                            span: start,
+                        });
+                    }
+                    '/' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Slash,
+                            span: start,
+                        });
+                    }
                     '-' => {
                         consume_one();
-                        if chars.peek() == Some(&'>') { chars.next(); col += 1; out.push(Tok { kind: TokKind::Arrow, span: start }); }
-                        else { out.push(Tok { kind: TokKind::Minus, span: start }); }
+                        if chars.peek() == Some(&'>') {
+                            chars.next();
+                            col += 1;
+                            out.push(Tok {
+                                kind: TokKind::Arrow,
+                                span: start,
+                            });
+                        } else {
+                            out.push(Tok {
+                                kind: TokKind::Minus,
+                                span: start,
+                            });
+                        }
                     }
                     '=' => {
                         consume_one();
-                        if chars.peek() == Some(&'>') { chars.next(); col += 1; out.push(Tok { kind: TokKind::FatArrow, span: start }); }
-                        else { out.push(Tok { kind: TokKind::Eq, span: start }); }
+                        if chars.peek() == Some(&'>') {
+                            chars.next();
+                            col += 1;
+                            out.push(Tok {
+                                kind: TokKind::FatArrow,
+                                span: start,
+                            });
+                        } else {
+                            out.push(Tok {
+                                kind: TokKind::Eq,
+                                span: start,
+                            });
+                        }
                     }
                     '!' => {
                         consume_one();
-                        if chars.peek() == Some(&'=') { chars.next(); col += 1; out.push(Tok { kind: TokKind::Ne, span: start }); }
-                        else { return Err(LexError { msg: "stray '!'".into(), span: start }); }
+                        if chars.peek() == Some(&'=') {
+                            chars.next();
+                            col += 1;
+                            out.push(Tok {
+                                kind: TokKind::Ne,
+                                span: start,
+                            });
+                        } else {
+                            return Err(LexError {
+                                msg: "stray '!'".into(),
+                                span: start,
+                            });
+                        }
                     }
                     '<' => {
                         consume_one();
-                        if chars.peek() == Some(&':') { chars.next(); col += 1; out.push(Tok { kind: TokKind::SubtypeOf, span: start }); }
-                        else if chars.peek() == Some(&'=') { chars.next(); col += 1; out.push(Tok { kind: TokKind::Le, span: start }); }
-                        else { out.push(Tok { kind: TokKind::Lt, span: start }); }
+                        if chars.peek() == Some(&':') {
+                            chars.next();
+                            col += 1;
+                            out.push(Tok {
+                                kind: TokKind::SubtypeOf,
+                                span: start,
+                            });
+                        } else if chars.peek() == Some(&'=') {
+                            chars.next();
+                            col += 1;
+                            out.push(Tok {
+                                kind: TokKind::Le,
+                                span: start,
+                            });
+                        } else {
+                            out.push(Tok {
+                                kind: TokKind::Lt,
+                                span: start,
+                            });
+                        }
                     }
                     '>' => {
                         consume_one();
-                        if chars.peek() == Some(&'=') { chars.next(); col += 1; out.push(Tok { kind: TokKind::Ge, span: start }); }
-                        else { out.push(Tok { kind: TokKind::Gt, span: start }); }
+                        if chars.peek() == Some(&'=') {
+                            chars.next();
+                            col += 1;
+                            out.push(Tok {
+                                kind: TokKind::Ge,
+                                span: start,
+                            });
+                        } else {
+                            out.push(Tok {
+                                kind: TokKind::Gt,
+                                span: start,
+                            });
+                        }
                     }
-                    '→' => { consume_one(); out.push(Tok { kind: TokKind::Arrow, span: start }); }
-                    '⇒' => { consume_one(); out.push(Tok { kind: TokKind::FatArrow, span: start }); }
-                    '∀' => { consume_one(); out.push(Tok { kind: TokKind::Ident("forall".into()), span: start }); }
-                    '∃' => { consume_one(); out.push(Tok { kind: TokKind::Ident("exists".into()), span: start }); }
-                    '∈' => { consume_one(); out.push(Tok { kind: TokKind::Ident("in".into()), span: start }); }
-                    '⊆' => { consume_one(); out.push(Tok { kind: TokKind::Ident("subset".into()), span: start }); }
-                    '∪' => { consume_one(); out.push(Tok { kind: TokKind::Ident("union".into()), span: start }); }
-                    '∩' => { consume_one(); out.push(Tok { kind: TokKind::Ident("intersect".into()), span: start }); }
-                    '∧' => { consume_one(); out.push(Tok { kind: TokKind::Ident("and".into()), span: start }); }
-                    '∨' => { consume_one(); out.push(Tok { kind: TokKind::Ident("or".into()), span: start }); }
-                    '¬' => { consume_one(); out.push(Tok { kind: TokKind::Ident("not".into()), span: start }); }
-                    '≤' => { consume_one(); out.push(Tok { kind: TokKind::Le, span: start }); }
-                    '≥' => { consume_one(); out.push(Tok { kind: TokKind::Ge, span: start }); }
-                    '≠' => { consume_one(); out.push(Tok { kind: TokKind::Ne, span: start }); }
-                    'ε' => { consume_one(); out.push(Tok { kind: TokKind::Ident("e".into()), span: start }); }
-                    'δ' => { consume_one(); out.push(Tok { kind: TokKind::Ident("d".into()), span: start }); }
-                    _ => return Err(LexError {
-                        msg: format!("unexpected character `{}`", c),
-                        span: start,
-                    }),
+                    '→' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Arrow,
+                            span: start,
+                        });
+                    }
+                    '⇒' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::FatArrow,
+                            span: start,
+                        });
+                    }
+                    '∀' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Ident("forall".into()),
+                            span: start,
+                        });
+                    }
+                    '∃' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Ident("exists".into()),
+                            span: start,
+                        });
+                    }
+                    '∈' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Ident("in".into()),
+                            span: start,
+                        });
+                    }
+                    '⊆' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Ident("subset".into()),
+                            span: start,
+                        });
+                    }
+                    '∪' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Ident("union".into()),
+                            span: start,
+                        });
+                    }
+                    '∩' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Ident("intersect".into()),
+                            span: start,
+                        });
+                    }
+                    '∧' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Ident("and".into()),
+                            span: start,
+                        });
+                    }
+                    '∨' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Ident("or".into()),
+                            span: start,
+                        });
+                    }
+                    '¬' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Ident("not".into()),
+                            span: start,
+                        });
+                    }
+                    '≤' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Le,
+                            span: start,
+                        });
+                    }
+                    '≥' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Ge,
+                            span: start,
+                        });
+                    }
+                    '≠' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Ne,
+                            span: start,
+                        });
+                    }
+                    'ε' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Ident("e".into()),
+                            span: start,
+                        });
+                    }
+                    'δ' => {
+                        consume_one();
+                        out.push(Tok {
+                            kind: TokKind::Ident("d".into()),
+                            span: start,
+                        });
+                    }
+                    _ => {
+                        return Err(LexError {
+                            msg: format!("unexpected character `{}`", c),
+                            span: start,
+                        })
+                    }
                 }
             }
         }
     }
 
     if !out.is_empty() && !matches!(out.last().unwrap().kind, TokKind::Newline) {
-        out.push(Tok { kind: TokKind::Newline, span: Span { line, col, len: 0 } });
+        out.push(Tok {
+            kind: TokKind::Newline,
+            span: Span { line, col, len: 0 },
+        });
     }
     while indent_stack.len() > 1 {
         indent_stack.pop();
-        out.push(Tok { kind: TokKind::Dedent, span: Span { line, col, len: 0 } });
+        out.push(Tok {
+            kind: TokKind::Dedent,
+            span: Span { line, col, len: 0 },
+        });
     }
-    out.push(Tok { kind: TokKind::Eof, span: Span { line, col, len: 0 } });
+    out.push(Tok {
+        kind: TokKind::Eof,
+        span: Span { line, col, len: 0 },
+    });
     Ok(out)
 }
 
-fn is_ident_start(c: char) -> bool { c.is_ascii_alphabetic() || c == '_' }
-fn is_ident_continue(c: char) -> bool { c.is_ascii_alphanumeric() || c == '_' }
+fn is_ident_start(c: char) -> bool {
+    c.is_ascii_alphabetic() || c == '_'
+}
+fn is_ident_continue(c: char) -> bool {
+    c.is_ascii_alphanumeric() || c == '_'
+}
 
 fn decimal_or_scientific_to_rat(buf: &str) -> Option<(i128, u128)> {
-    let (mantissa, exp): (&str, i32) = if let Some(idx) = buf.find(|c: char| c == 'e' || c == 'E') {
+    let (mantissa, exp): (&str, i32) = if let Some(idx) = buf.find(['e', 'E']) {
         let (m, e) = buf.split_at(idx);
         let e = &e[1..];
         (m, e.parse().ok()?)
@@ -347,12 +714,18 @@ fn decimal_or_scientific_to_rat(buf: &str) -> Option<(i128, u128)> {
 
 fn reduce(p: i128, q: u128) -> (i128, u128) {
     let g = gcd(p.unsigned_abs(), q);
-    if g == 0 { return (p, q); }
+    if g == 0 {
+        return (p, q);
+    }
     (p / g as i128, q / g)
 }
 
 fn gcd(mut a: u128, mut b: u128) -> u128 {
-    while b != 0 { let t = b; b = a % b; a = t; }
+    while b != 0 {
+        let t = b;
+        b = a % b;
+        a = t;
+    }
     a
 }
 
@@ -384,7 +757,10 @@ mod tests {
     fn decimal_to_rat() {
         let toks = lex("0.13").unwrap();
         match &toks[0].kind {
-            TokKind::RatLit(p, q) => { assert_eq!(*p, 13); assert_eq!(*q, 100); }
+            TokKind::RatLit(p, q) => {
+                assert_eq!(*p, 13);
+                assert_eq!(*q, 100);
+            }
             _ => panic!(),
         }
     }
@@ -393,7 +769,10 @@ mod tests {
     fn scientific_to_rat() {
         let toks = lex("1e-9").unwrap();
         match &toks[0].kind {
-            TokKind::RatLit(p, q) => { assert_eq!(*p, 1); assert_eq!(*q, 1_000_000_000); }
+            TokKind::RatLit(p, q) => {
+                assert_eq!(*p, 1);
+                assert_eq!(*q, 1_000_000_000);
+            }
             _ => panic!(),
         }
     }

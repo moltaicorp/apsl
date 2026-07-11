@@ -1,4 +1,3 @@
-
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -27,7 +26,9 @@ impl std::fmt::Display for StoreError {
 }
 
 impl From<std::io::Error> for StoreError {
-    fn from(e: std::io::Error) -> Self { StoreError::Io(e) }
+    fn from(e: std::io::Error) -> Self {
+        StoreError::Io(e)
+    }
 }
 
 fn cert_path(base: &Path, hash: &str) -> PathBuf {
@@ -61,7 +62,9 @@ pub fn get_bytes(hash: &str, base: &Path) -> Result<String, StoreError> {
     }
     let bytes = std::fs::read_to_string(&path)?;
     let actual = sha256_hex(bytes.as_bytes());
-    if actual != hash { return Err(StoreError::HashMismatch); }
+    if actual != hash {
+        return Err(StoreError::HashMismatch);
+    }
     Ok(bytes)
 }
 
@@ -81,13 +84,23 @@ mod tests {
         Node {
             name: Ident::new("t"),
             sig: TypeSig {
-                params: vec![Param { name: Ident::new("in"), ty: Type::Base(Ident::new("Int")) }],
+                params: vec![Param {
+                    name: Ident::new("in"),
+                    ty: Type::Base(Ident::new("Int")),
+                }],
                 ret: Type::Base(Ident::new("Int")),
             },
-            pre: vec![], post: vec![],
-            cx: CxSpec { bigo: CxExpr::Const, class: RuntimeClass::Idem },
-            sla: None, via: None,
-            auth: AuthLevel::None, scope_constraint: ScopeConstraint::Any, audit_req: AuditReq::None,
+            pre: vec![],
+            post: vec![],
+            cx: CxSpec {
+                bigo: CxExpr::Const,
+                class: RuntimeClass::Idem,
+            },
+            sla: None,
+            via: None,
+            auth: AuthLevel::None,
+            scope_constraint: ScopeConstraint::Any,
+            audit_req: AuditReq::None,
             state: vec![],
             deploy: None,
             span: Span::NONE,
@@ -98,7 +111,9 @@ mod tests {
         let base = std::env::temp_dir();
         let pid = std::process::id();
         let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos();
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .subsec_nanos();
         let dir = base.join(format!("apsl-cert-store-{}-{}", pid, nanos));
         std::fs::create_dir_all(&dir).unwrap();
         dir
@@ -108,7 +123,15 @@ mod tests {
     fn put_and_get_roundtrip() {
         let dir = tempdir();
         let (sk, _vk) = new_keypair();
-        let c = emit(&trivial_node(), None, "ok", "O(1)", vec![], TcbManifest::default(), &sk);
+        let c = emit(
+            &trivial_node(),
+            None,
+            "ok",
+            "O(1)",
+            vec![],
+            TcbManifest::default(),
+            &sk,
+        );
         let h = put(&c, &dir).unwrap();
         let bytes = get_bytes(&h, &dir).unwrap();
         assert!(!bytes.is_empty());

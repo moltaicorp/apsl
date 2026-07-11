@@ -1,4 +1,3 @@
-
 use std::io::Write;
 use std::process::{Command, Stdio};
 
@@ -61,7 +60,9 @@ fn run_subprocess(cmd: &str, args: &[&str], stdin_text: &str) -> SolverResult {
     };
     if let Some(mut stdin) = child.stdin.take() {
         let mut s = stdin_text.to_string();
-        if !s.ends_with('\n') { s.push('\n'); }
+        if !s.ends_with('\n') {
+            s.push('\n');
+        }
         s.push_str("(get-model)\n(exit)\n");
         if let Err(e) = stdin.write_all(s.as_bytes()) {
             return SolverResult::Error(format!("stdin write failed: {}", e));
@@ -113,8 +114,12 @@ fn parse_model(text: &str) -> Model {
 }
 
 pub fn default_solver() -> Box<dyn Solver> {
-    if probe("z3") { return Box::new(Z3Solver); }
-    if probe("cvc5") { return Box::new(Cvc5Solver); }
+    if probe("z3") {
+        return Box::new(Z3Solver);
+    }
+    if probe("cvc5") {
+        return Box::new(Cvc5Solver);
+    }
     Box::new(NullSolver)
 }
 
@@ -136,7 +141,9 @@ mod tests {
     #[test]
     fn null_solver_returns_unknown() {
         let s = NullSolver;
-        let script = Smt2Script { text: String::new() };
+        let script = Smt2Script {
+            text: String::new(),
+        };
         match s.check(&script) {
             SolverResult::Unknown(msg) => assert!(msg.contains("no SMT backend")),
             _ => panic!("expected unknown"),

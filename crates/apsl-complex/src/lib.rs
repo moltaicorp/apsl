@@ -1,4 +1,3 @@
-
 #![forbid(unsafe_code)]
 
 mod algebra;
@@ -7,7 +6,7 @@ mod hints;
 
 use std::collections::BTreeSet;
 
-use apsl_core::ast::{CxExpr, Decl, Ident, Node, Program};
+use apsl_core::ast::{CxExpr, Decl, Ident, Node};
 use apsl_types::TypedProgram;
 
 pub use algebra::{dominant_term, dominant_weight, exceeds_n_log_n, normalize, Term, Weight};
@@ -25,13 +24,8 @@ pub struct NodeReport {
 #[derive(Debug, Clone)]
 pub enum NodeStatus {
     Ok,
-    Exceeds {
-        hint: String,
-        kind: HintKind,
-    },
-    Mismatch {
-        hint: String,
-    },
+    Exceeds { hint: String, kind: HintKind },
+    Mismatch { hint: String },
 }
 
 #[derive(Debug, Clone, Default)]
@@ -41,7 +35,9 @@ pub struct ComplexityReport {
 
 impl ComplexityReport {
     pub fn all_ok(&self) -> bool {
-        self.per_node.iter().all(|n| matches!(n.status, NodeStatus::Ok))
+        self.per_node
+            .iter()
+            .all(|n| matches!(n.status, NodeStatus::Ok))
     }
 }
 
@@ -67,13 +63,19 @@ fn prove_node(n: &Node) -> NodeReport {
         NodeStatus::Mismatch {
             hint: format!(
                 "you declared O({:?}) but the body's derived cost is O({:?})",
-                summary(&declared), summary(&derived),
+                summary(&declared),
+                summary(&derived),
             ),
         }
     } else {
         NodeStatus::Ok
     };
-    NodeReport { node: n.name.clone(), derived, declared, status }
+    NodeReport {
+        node: n.name.clone(),
+        derived,
+        declared,
+        status,
+    }
 }
 
 fn collect_size_vars(n: &Node) -> BTreeSet<Ident> {
@@ -96,7 +98,10 @@ fn summary(e: &CxExpr) -> String {
         NLogN(n) => format!("{} log {}", n.as_str(), n.as_str()),
         Sum(es) => es.iter().map(summary).collect::<Vec<_>>().join(" + "),
         Prod(es) => es.iter().map(summary).collect::<Vec<_>>().join(" * "),
-        Max(es) => format!("max({})", es.iter().map(summary).collect::<Vec<_>>().join(", ")),
+        Max(es) => format!(
+            "max({})",
+            es.iter().map(summary).collect::<Vec<_>>().join(", ")
+        ),
     }
 }
 
@@ -108,14 +113,16 @@ fn simplify(e: &CxExpr) -> CxExpr {
             for x in xs {
                 match simplify(x) {
                     Sum(inner) => flat.extend(inner),
-                    Const => {} 
+                    Const => {}
                     other => flat.push(other),
                 }
             }
-            if flat.is_empty() { Const }
-            else if flat.len() == 1 { flat.remove(0) }
-            else {
-                flat.sort_by(|a, b| dominant_weight(b).cmp(&dominant_weight(a)));
+            if flat.is_empty() {
+                Const
+            } else if flat.len() == 1 {
+                flat.remove(0)
+            } else {
+                flat.sort_by_key(|value| std::cmp::Reverse(dominant_weight(value)));
                 flat.dedup();
                 Sum(flat)
             }
@@ -129,15 +136,23 @@ fn simplify(e: &CxExpr) -> CxExpr {
                     other => flat.push(other),
                 }
             }
-            if flat.is_empty() { Const }
-            else if flat.len() == 1 { flat.remove(0) }
-            else { Prod(flat) }
+            if flat.is_empty() {
+                Const
+            } else if flat.len() == 1 {
+                flat.remove(0)
+            } else {
+                Prod(flat)
+            }
         }
         Max(xs) => {
             let mut flat: Vec<_> = xs.iter().map(simplify).collect();
-            flat.sort_by(|a, b| dominant_weight(b).cmp(&dominant_weight(a)));
+            flat.sort_by_key(|value| std::cmp::Reverse(dominant_weight(value)));
             flat.dedup();
-            if flat.len() == 1 { flat.remove(0) } else { Max(flat) }
+            if flat.len() == 1 {
+                flat.remove(0)
+            } else {
+                Max(flat)
+            }
         }
         other => other.clone(),
     }

@@ -1,4 +1,3 @@
-
 use std::collections::BTreeMap;
 
 use apsl_core::ast::{CxExpr, Expr, Ident, Node, Type};
@@ -21,11 +20,17 @@ pub fn derive_node_cost(n: &Node) -> CxExpr {
     for p in n.pre.iter().chain(n.post.iter()) {
         parts.push(cost_of(p, &size_for));
     }
-    if parts.is_empty() { CxExpr::Const } else { simplify_sum(parts) }
+    if parts.is_empty() {
+        CxExpr::Const
+    } else {
+        simplify_sum(parts)
+    }
 }
 
 fn simplify_sum(mut xs: Vec<CxExpr>) -> CxExpr {
-    if xs.len() == 1 { return xs.pop().unwrap(); }
+    if xs.len() == 1 {
+        return xs.pop().unwrap();
+    }
     CxExpr::Sum(xs)
 }
 
@@ -55,7 +60,9 @@ fn cost_of(e: &Expr, size_for: &BTreeMap<Ident, Ident>) -> CxExpr {
             cost_of(c, size_for),
             CxExpr::Max(vec![cost_of(a, size_for), cost_of(b, size_for)]),
         ]),
-        Expr::Let(_, e1, body, _) => CxExpr::Sum(vec![cost_of(e1, size_for), cost_of(body, size_for)]),
+        Expr::Let(_, e1, body, _) => {
+            CxExpr::Sum(vec![cost_of(e1, size_for), cost_of(body, size_for)])
+        }
         Expr::Tuple(es, _) => CxExpr::Sum(es.iter().map(|e| cost_of(e, size_for)).collect()),
         Expr::Lam(_, body, _) => cost_of(body, size_for),
     }
@@ -74,44 +81,38 @@ fn apply_cost(name: &Ident, args: &[Expr], size_for: &BTreeMap<Ident, Ident>) ->
                 Expr::Lam(_, body, _) => cost_of(body, size_for),
                 _ => cost_of(a, size_for),
             }
-        } else { CxExpr::Const }
+        } else {
+            CxExpr::Const
+        }
     };
     let intrinsic = match n {
-        "+" | "-" | "*" | "div" | "mod" | "=" | "!=" | "<" | "<=" | ">" | ">=" |
-        "and" | "or" | "not" | "cons" | "nil" | "head" | "tail" | "nth" | "len" => CxExpr::Const,
+        "+" | "-" | "*" | "div" | "mod" | "=" | "!=" | "<" | "<=" | ">" | ">=" | "and" | "or"
+        | "not" | "cons" | "nil" | "head" | "tail" | "nth" | "len" => CxExpr::Const,
         "valid_email?" | "well_formed_json?" => CxExpr::Const,
-        "every" | "some" | "count" => {
-            match args.get(0).and_then(|a| size_for_expr(a, size_for)) {
-                Some(sv) => CxExpr::Prod(vec![CxExpr::Size(sv), body_cost(1)]),
-                None => body_cost(1),
-            }
-        }
-        "map" | "filter" => {
-            match args.get(1).and_then(|a| size_for_expr(a, size_for)) {
-                Some(sv) => CxExpr::Prod(vec![CxExpr::Size(sv), body_cost(0)]),
-                None => body_cost(0),
-            }
-        }
-        "fold" => {
-            match args.get(2).and_then(|a| size_for_expr(a, size_for)) {
-                Some(sv) => CxExpr::Prod(vec![CxExpr::Size(sv), body_cost(0)]),
-                None => body_cost(0),
-            }
-        }
-        "group_by" | "sort_by" => {
-            match args.get(0).and_then(|a| size_for_expr(a, size_for)) {
-                Some(sv) => CxExpr::Prod(vec![CxExpr::NLogN(sv), body_cost(1)]),
-                None => body_cost(1),
-            }
-        }
+        "every" | "some" | "count" => match args.first().and_then(|a| size_for_expr(a, size_for)) {
+            Some(sv) => CxExpr::Prod(vec![CxExpr::Size(sv), body_cost(1)]),
+            None => body_cost(1),
+        },
+        "map" | "filter" => match args.get(1).and_then(|a| size_for_expr(a, size_for)) {
+            Some(sv) => CxExpr::Prod(vec![CxExpr::Size(sv), body_cost(0)]),
+            None => body_cost(0),
+        },
+        "fold" => match args.get(2).and_then(|a| size_for_expr(a, size_for)) {
+            Some(sv) => CxExpr::Prod(vec![CxExpr::Size(sv), body_cost(0)]),
+            None => body_cost(0),
+        },
+        "group_by" | "sort_by" => match args.first().and_then(|a| size_for_expr(a, size_for)) {
+            Some(sv) => CxExpr::Prod(vec![CxExpr::NLogN(sv), body_cost(1)]),
+            None => body_cost(1),
+        },
         "sort" | "unique?" | "dedupe" => {
-            match args.get(0).and_then(|a| size_for_expr(a, size_for)) {
+            match args.first().and_then(|a| size_for_expr(a, size_for)) {
                 Some(sv) => CxExpr::NLogN(sv),
                 None => CxExpr::Const,
             }
         }
         "subseteq?" => {
-            let a0 = args.get(0).and_then(|a| size_for_expr(a, size_for));
+            let a0 = args.first().and_then(|a| size_for_expr(a, size_for));
             let a1 = args.get(1).and_then(|a| size_for_expr(a, size_for));
             match (a0, a1) {
                 (Some(s0), Some(s1)) => CxExpr::Sum(vec![CxExpr::NLogN(s0), CxExpr::NLogN(s1)]),
@@ -120,12 +121,12 @@ fn apply_cost(name: &Ident, args: &[Expr], size_for: &BTreeMap<Ident, Ident>) ->
             }
         }
         "concat" | "zip" | "reverse" => {
-            match args.get(0).and_then(|a| size_for_expr(a, size_for)) {
+            match args.first().and_then(|a| size_for_expr(a, size_for)) {
                 Some(sv) => CxExpr::Size(sv),
                 None => CxExpr::Const,
             }
         }
-        _ => CxExpr::Const, 
+        _ => CxExpr::Const,
     };
     match (arg_cost, intrinsic) {
         (CxExpr::Const, CxExpr::Const) => CxExpr::Const,

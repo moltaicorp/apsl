@@ -1,4 +1,3 @@
-
 use std::fmt::Write;
 
 pub trait Canon {
@@ -16,7 +15,7 @@ pub fn write_str(out: &mut String, s: &str) {
     for c in s.chars() {
         match c {
             '\\' => out.push_str("\\\\"),
-            '"'  => out.push_str("\\\""),
+            '"' => out.push_str("\\\""),
             '\n' => out.push_str("\\n"),
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
@@ -45,7 +44,9 @@ pub fn write_bool(out: &mut String, b: bool) {
     out.push_str(if b { "true" } else { "false" });
 }
 
-pub fn write_null(out: &mut String) { out.push_str("null"); }
+pub fn write_null(out: &mut String) {
+    out.push_str("null");
+}
 
 pub struct ArrayWriter<'a> {
     out: &'a mut String,
@@ -58,11 +59,15 @@ impl<'a> ArrayWriter<'a> {
         Self { out, first: true }
     }
     pub fn item<F: FnOnce(&mut String)>(&mut self, f: F) {
-        if !self.first { self.out.push(','); }
+        if !self.first {
+            self.out.push(',');
+        }
         self.first = false;
         f(self.out);
     }
-    pub fn finish(self) { self.out.push(']'); }
+    pub fn finish(self) {
+        self.out.push(']');
+    }
 }
 
 pub struct ObjectWriter<'a> {
@@ -72,7 +77,10 @@ pub struct ObjectWriter<'a> {
 
 impl<'a> ObjectWriter<'a> {
     pub fn new(out: &'a mut String) -> Self {
-        Self { out, entries: Vec::new() }
+        Self {
+            out,
+            entries: Vec::new(),
+        }
     }
     pub fn field<F: FnOnce(&mut String)>(&mut self, key: &str, f: F) {
         let mut v = String::new();
@@ -84,7 +92,9 @@ impl<'a> ObjectWriter<'a> {
         self.entries.sort_by(|a, b| a.0.cmp(&b.0));
         let mut first = true;
         for (k, v) in &self.entries {
-            if !first { self.out.push(','); }
+            if !first {
+                self.out.push(',');
+            }
             first = false;
             write_str(self.out, k);
             self.out.push(':');
@@ -96,30 +106,49 @@ impl<'a> ObjectWriter<'a> {
 
 fn reduce(p: i128, q: u128) -> (i128, u128) {
     let g = gcd(p.unsigned_abs(), q);
-    if g == 0 { return (p, q); }
+    if g == 0 {
+        return (p, q);
+    }
     (p / g as i128, q / g)
 }
 
 fn gcd(mut a: u128, mut b: u128) -> u128 {
-    while b != 0 { let t = b; b = a % b; a = t; }
+    while b != 0 {
+        let t = b;
+        b = a % b;
+        a = t;
+    }
     a
 }
-
 
 use crate::ast::*;
 
 impl Canon for Ident {
-    fn write_canon(&self, out: &mut String) { write_str(out, &self.0); }
+    fn write_canon(&self, out: &mut String) {
+        write_str(out, &self.0);
+    }
 }
 
 impl Canon for Lit {
     fn write_canon(&self, out: &mut String) {
         let mut ow = ObjectWriter::new(out);
         match self {
-            Lit::Int(n)   => { ow.field("k", |o| write_str(o, "i")); ow.field("v", |o| write_int(o, *n)); }
-            Lit::Rat(p,q) => { ow.field("k", |o| write_str(o, "r")); ow.field("v", |o| write_rat(o, *p, *q)); }
-            Lit::Bool(b)  => { ow.field("k", |o| write_str(o, "b")); ow.field("v", |o| write_bool(o, *b)); }
-            Lit::Str(s)   => { ow.field("k", |o| write_str(o, "s")); ow.field("v", |o| write_str(o, s)); }
+            Lit::Int(n) => {
+                ow.field("k", |o| write_str(o, "i"));
+                ow.field("v", |o| write_int(o, *n));
+            }
+            Lit::Rat(p, q) => {
+                ow.field("k", |o| write_str(o, "r"));
+                ow.field("v", |o| write_rat(o, *p, *q));
+            }
+            Lit::Bool(b) => {
+                ow.field("k", |o| write_str(o, "b"));
+                ow.field("v", |o| write_bool(o, *b));
+            }
+            Lit::Str(s) => {
+                ow.field("k", |o| write_str(o, "s"));
+                ow.field("v", |o| write_str(o, s));
+            }
         }
         ow.finish();
     }
@@ -141,7 +170,9 @@ impl Canon for Type {
                 ow.field("k", |o| write_str(o, "tuple"));
                 ow.field("ts", |o| {
                     let mut aw = ArrayWriter::new(o);
-                    for t in ts { aw.item(|o2| t.write_canon(o2)); }
+                    for t in ts {
+                        aw.item(|o2| t.write_canon(o2));
+                    }
                     aw.finish();
                 });
             }
@@ -173,7 +204,9 @@ impl Canon for Type {
                 ow.field("n", |o| name.write_canon(o));
                 ow.field("a", |o| {
                     let mut aw = ArrayWriter::new(o);
-                    for arg in args { aw.item(|o2| arg.write_canon(o2)); }
+                    for arg in args {
+                        aw.item(|o2| arg.write_canon(o2));
+                    }
                     aw.finish();
                 });
             }
@@ -196,7 +229,9 @@ impl Canon for TypeSig {
         let mut ow = ObjectWriter::new(out);
         ow.field("p", |o| {
             let mut aw = ArrayWriter::new(o);
-            for p in &self.params { aw.item(|o2| p.write_canon(o2)); }
+            for p in &self.params {
+                aw.item(|o2| p.write_canon(o2));
+            }
             aw.finish();
         });
         ow.field("r", |o| self.ret.write_canon(o));
@@ -204,16 +239,63 @@ impl Canon for TypeSig {
     }
 }
 
+impl Canon for AuthLevel {
+    fn write_canon(&self, out: &mut String) {
+        write_str(
+            out,
+            match self {
+                AuthLevel::None => "none",
+                AuthLevel::Bearer => "bearer",
+                AuthLevel::Session => "session",
+                AuthLevel::Passkey => "passkey",
+            },
+        );
+    }
+}
+
+impl Canon for ScopeConstraint {
+    fn write_canon(&self, out: &mut String) {
+        write_str(
+            out,
+            match self {
+                ScopeConstraint::Any => "any",
+                ScopeConstraint::Narrowing => "narrowing",
+                ScopeConstraint::Admitted => "admitted",
+            },
+        );
+    }
+}
+
+impl Canon for AuditReq {
+    fn write_canon(&self, out: &mut String) {
+        write_str(
+            out,
+            match self {
+                AuditReq::None => "none",
+                AuditReq::Before => "before",
+                AuditReq::After => "after",
+                AuditReq::Both => "both",
+            },
+        );
+    }
+}
+
 impl Canon for BinOp {
     fn write_canon(&self, out: &mut String) {
         let s = match self {
-            BinOp::Eq => "=", BinOp::Ne => "!=",
-            BinOp::Lt => "<", BinOp::Le => "<=",
-            BinOp::Gt => ">", BinOp::Ge => ">=",
-            BinOp::Add => "+", BinOp::Sub => "-",
-            BinOp::Mul => "*", BinOp::Div => "/",
+            BinOp::Eq => "=",
+            BinOp::Ne => "!=",
+            BinOp::Lt => "<",
+            BinOp::Le => "<=",
+            BinOp::Gt => ">",
+            BinOp::Ge => ">=",
+            BinOp::Add => "+",
+            BinOp::Sub => "-",
+            BinOp::Mul => "*",
+            BinOp::Div => "/",
             BinOp::Mod => "mod",
-            BinOp::And => "and", BinOp::Or => "or",
+            BinOp::And => "and",
+            BinOp::Or => "or",
             BinOp::Subset => "subset",
             BinOp::Union => "union",
             BinOp::Intersect => "intersect",
@@ -224,13 +306,25 @@ impl Canon for BinOp {
 
 impl Canon for UnOp {
     fn write_canon(&self, out: &mut String) {
-        write_str(out, match self { UnOp::Not => "not", UnOp::Neg => "neg" });
+        write_str(
+            out,
+            match self {
+                UnOp::Not => "not",
+                UnOp::Neg => "neg",
+            },
+        );
     }
 }
 
 impl Canon for Quant {
     fn write_canon(&self, out: &mut String) {
-        write_str(out, match self { Quant::Forall => "forall", Quant::Exists => "exists" });
+        write_str(
+            out,
+            match self {
+                Quant::Forall => "forall",
+                Quant::Exists => "exists",
+            },
+        );
     }
 }
 
@@ -256,7 +350,9 @@ impl Canon for Expr {
                 ow.field("f", |o| id.write_canon(o));
                 ow.field("a", |o| {
                     let mut aw = ArrayWriter::new(o);
-                    for a in args { aw.item(|o2| a.write_canon(o2)); }
+                    for a in args {
+                        aw.item(|o2| a.write_canon(o2));
+                    }
                     aw.finish();
                 });
             }
@@ -294,7 +390,9 @@ impl Canon for Expr {
                 ow.field("k", |o| write_str(o, "tuple"));
                 ow.field("a", |o| {
                     let mut aw = ArrayWriter::new(o);
-                    for e in es { aw.item(|o2| e.write_canon(o2)); }
+                    for e in es {
+                        aw.item(|o2| e.write_canon(o2));
+                    }
                     aw.finish();
                 });
             }
@@ -302,7 +400,9 @@ impl Canon for Expr {
                 ow.field("k", |o| write_str(o, "lam"));
                 ow.field("p", |o| {
                     let mut aw = ArrayWriter::new(o);
-                    for p in params { aw.item(|o2| p.write_canon(o2)); }
+                    for p in params {
+                        aw.item(|o2| p.write_canon(o2));
+                    }
                     aw.finish();
                 });
                 ow.field("b", |o| body.write_canon(o));
@@ -316,10 +416,21 @@ impl Canon for CxExpr {
     fn write_canon(&self, out: &mut String) {
         let mut ow = ObjectWriter::new(out);
         match self {
-            CxExpr::Const => { ow.field("k", |o| write_str(o, "const")); }
-            CxExpr::Size(n) => { ow.field("k", |o| write_str(o, "size")); ow.field("n", |o| n.write_canon(o)); }
-            CxExpr::NLogN(n) => { ow.field("k", |o| write_str(o, "nlogn")); ow.field("n", |o| n.write_canon(o)); }
-            CxExpr::LogN(n) => { ow.field("k", |o| write_str(o, "logn")); ow.field("n", |o| n.write_canon(o)); }
+            CxExpr::Const => {
+                ow.field("k", |o| write_str(o, "const"));
+            }
+            CxExpr::Size(n) => {
+                ow.field("k", |o| write_str(o, "size"));
+                ow.field("n", |o| n.write_canon(o));
+            }
+            CxExpr::NLogN(n) => {
+                ow.field("k", |o| write_str(o, "nlogn"));
+                ow.field("n", |o| n.write_canon(o));
+            }
+            CxExpr::LogN(n) => {
+                ow.field("k", |o| write_str(o, "logn"));
+                ow.field("n", |o| n.write_canon(o));
+            }
             CxExpr::Sum(es) => write_list(&mut ow, "sum", es),
             CxExpr::Prod(es) => write_list(&mut ow, "prod", es),
             CxExpr::Max(es) => write_list(&mut ow, "max", es),
@@ -330,7 +441,9 @@ impl Canon for CxExpr {
             ow.field("k", |o| write_str(o, tag));
             ow.field("a", |o| {
                 let mut aw = ArrayWriter::new(o);
-                for e in es { aw.item(|o2| e.write_canon(o2)); }
+                for e in es {
+                    aw.item(|o2| e.write_canon(o2));
+                }
                 aw.finish();
             });
         }
@@ -339,11 +452,14 @@ impl Canon for CxExpr {
 
 impl Canon for RuntimeClass {
     fn write_canon(&self, out: &mut String) {
-        write_str(out, match self {
-            RuntimeClass::Idem => "idem",
-            RuntimeClass::IdemComplex => "idem-complex",
-            RuntimeClass::AntiIdem => "anti-idem",
-        });
+        write_str(
+            out,
+            match self {
+                RuntimeClass::Idem => "idem",
+                RuntimeClass::IdemComplex => "idem-complex",
+                RuntimeClass::AntiIdem => "anti-idem",
+            },
+        );
     }
 }
 
@@ -404,7 +520,9 @@ impl Canon for TypeAlias {
         if !self.supertypes.is_empty() {
             ow.field("supertypes", |o| {
                 let mut aw = ArrayWriter::new(o);
-                for st in &self.supertypes { aw.item(|o2| st.write_canon(o2)); }
+                for st in &self.supertypes {
+                    aw.item(|o2| st.write_canon(o2));
+                }
                 aw.finish();
             });
         }
@@ -437,26 +555,42 @@ impl Canon for Bind {
 impl Canon for DeployClauses {
     fn write_canon(&self, out: &mut String) {
         let mut ow = ObjectWriter::new(out);
-        if let Some(e) = &self.emits { ow.field("emits", |o| e.write_canon(o)); }
-        if let Some(s) = &self.stage { ow.field("stage", |o| s.write_canon(o)); }
-        if let Some(i) = &self.image { ow.field("image", |o| i.write_canon(o)); }
+        if let Some(e) = &self.emits {
+            ow.field("emits", |o| e.write_canon(o));
+        }
+        if let Some(s) = &self.stage {
+            ow.field("stage", |o| s.write_canon(o));
+        }
+        if let Some(i) = &self.image {
+            ow.field("image", |o| i.write_canon(o));
+        }
         if !self.needs.is_empty() {
             ow.field("needs", |o| {
                 let mut aw = ArrayWriter::new(o);
-                for n in &self.needs { aw.item(|o2| n.write_canon(o2)); }
+                for n in &self.needs {
+                    aw.item(|o2| n.write_canon(o2));
+                }
                 aw.finish();
             });
         }
         if !self.binds.is_empty() {
             ow.field("binds", |o| {
                 let mut aw = ArrayWriter::new(o);
-                for b in &self.binds { aw.item(|o2| b.write_canon(o2)); }
+                for b in &self.binds {
+                    aw.item(|o2| b.write_canon(o2));
+                }
                 aw.finish();
             });
         }
-        if let Some(g) = &self.gate { ow.field("gate", |o| g.write_canon(o)); }
-        if let Some(p) = &self.proof { ow.field("proof", |o| p.write_canon(o)); }
-        if let Some(d) = &self.delegation { ow.field("delegation", |o| d.write_canon(o)); }
+        if let Some(g) = &self.gate {
+            ow.field("gate", |o| g.write_canon(o));
+        }
+        if let Some(p) = &self.proof {
+            ow.field("proof", |o| p.write_canon(o));
+        }
+        if let Some(d) = &self.delegation {
+            ow.field("delegation", |o| d.write_canon(o));
+        }
         ow.finish();
     }
 }
@@ -464,17 +598,23 @@ impl Canon for DeployClauses {
 impl Canon for Node {
     fn write_canon(&self, out: &mut String) {
         let mut ow = ObjectWriter::new(out);
+        ow.field("audit", |o| self.audit_req.write_canon(o));
+        ow.field("auth", |o| self.auth.write_canon(o));
         ow.field("k", |o| write_str(o, "node"));
         ow.field("n", |o| self.name.write_canon(o));
         ow.field("s", |o| self.sig.write_canon(o));
         ow.field("pre", |o| {
             let mut aw = ArrayWriter::new(o);
-            for p in &self.pre { aw.item(|o2| p.write_canon(o2)); }
+            for p in &self.pre {
+                aw.item(|o2| p.write_canon(o2));
+            }
             aw.finish();
         });
         ow.field("post", |o| {
             let mut aw = ArrayWriter::new(o);
-            for p in &self.post { aw.item(|o2| p.write_canon(o2)); }
+            for p in &self.post {
+                aw.item(|o2| p.write_canon(o2));
+            }
             aw.finish();
         });
         ow.field("cx", |o| self.cx.write_canon(o));
@@ -482,17 +622,22 @@ impl Canon for Node {
             Some(s) => s.write_canon(o),
             None => write_null(o),
         });
+        ow.field("scope", |o| self.scope_constraint.write_canon(o));
         ow.field("via", |o| match &self.via {
             Some(v) => v.write_canon(o),
             None => write_null(o),
         });
         ow.field("state", |o| {
             let mut aw = ArrayWriter::new(o);
-            for s in &self.state { aw.item(|o2| s.write_canon(o2)); }
+            for s in &self.state {
+                aw.item(|o2| s.write_canon(o2));
+            }
             aw.finish();
         });
         if let Some(d) = &self.deploy {
-            if !d.is_empty() { ow.field("deploy", |o| d.write_canon(o)); }
+            if !d.is_empty() {
+                ow.field("deploy", |o| d.write_canon(o));
+            }
         }
         ow.finish();
     }
@@ -504,7 +649,9 @@ impl Canon for FlowStep {
             self.nodes[0].write_canon(out);
         } else {
             let mut aw = ArrayWriter::new(out);
-            for n in &self.nodes { aw.item(|o| n.write_canon(o)); }
+            for n in &self.nodes {
+                aw.item(|o| n.write_canon(o));
+            }
             aw.finish();
         }
     }
@@ -518,7 +665,9 @@ impl Canon for Graph {
         ow.field("s", |o| self.sig.write_canon(o));
         ow.field("post", |o| {
             let mut aw = ArrayWriter::new(o);
-            for p in &self.post { aw.item(|o2| p.write_canon(o2)); }
+            for p in &self.post {
+                aw.item(|o2| p.write_canon(o2));
+            }
             aw.finish();
         });
         ow.field("flow", |o| {
@@ -526,7 +675,9 @@ impl Canon for Graph {
             for chain in &self.flow {
                 aw.item(|o2| {
                     let mut aw2 = ArrayWriter::new(o2);
-                    for f in chain { aw2.item(|o3| f.write_canon(o3)); }
+                    for f in chain {
+                        aw2.item(|o3| f.write_canon(o3));
+                    }
                     aw2.finish();
                 });
             }
@@ -535,7 +686,9 @@ impl Canon for Graph {
         if !self.state.is_empty() {
             ow.field("state", |o| {
                 let mut aw = ArrayWriter::new(o);
-                for s in &self.state { aw.item(|o2| s.write_canon(o2)); }
+                for s in &self.state {
+                    aw.item(|o2| s.write_canon(o2));
+                }
                 aw.finish();
             });
         }
@@ -556,7 +709,9 @@ impl Canon for Decl {
 impl Canon for Program {
     fn write_canon(&self, out: &mut String) {
         let mut aw = ArrayWriter::new(out);
-        for d in &self.decls { aw.item(|o| d.write_canon(o)); }
+        for d in &self.decls {
+            aw.item(|o| d.write_canon(o));
+        }
         aw.finish();
     }
 }
@@ -582,8 +737,8 @@ mod tests {
     fn keys_sorted() {
         let mut s = String::new();
         let mut ow = ObjectWriter::new(&mut s);
-        ow.field("zebra", |o| o.push_str("1"));
-        ow.field("apple", |o| o.push_str("2"));
+        ow.field("zebra", |o| o.push('1'));
+        ow.field("apple", |o| o.push('2'));
         ow.finish();
         assert_eq!(s, "{\"apple\":2,\"zebra\":1}");
     }

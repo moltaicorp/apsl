@@ -1,4 +1,3 @@
-
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 
 use apsl_core::ast::Node;
@@ -17,7 +16,11 @@ pub struct ClauseProof {
 impl Canon for ClauseProof {
     fn write_canon(&self, out: &mut String) {
         let mut ow = ObjectWriter::new(out);
-        ow.field("c", |o| { let mut s = String::new(); s.push_str(&self.clause_id.to_string()); write_str(o, &s); });
+        ow.field("c", |o| {
+            let mut s = String::new();
+            s.push_str(&self.clause_id.to_string());
+            write_str(o, &s);
+        });
         ow.field("v", |o| write_str(o, &self.verdict));
         ow.field("n", |o| write_str(o, &self.note));
         ow.finish();
@@ -46,7 +49,9 @@ impl Canon for Certificate {
         ow.field("impl", |o| write_str(o, &self.impl_hash));
         ow.field("preds", |o| {
             let mut aw = ArrayWriter::new(o);
-            for p in &self.pred_proofs { aw.item(|o2| p.write_canon(o2)); }
+            for p in &self.pred_proofs {
+                aw.item(|o2| p.write_canon(o2));
+            }
             aw.finish();
         });
         ow.field("sig", |o| write_str(o, &self.sig_hex));
@@ -109,11 +114,15 @@ pub fn verify(
     }
     let body = canon_without_sig(c);
     let sig_bytes = hex_to_bytes(&c.sig_hex).ok_or(VerifyError::MalformedSignature)?;
-    if sig_bytes.len() != 64 { return Err(VerifyError::MalformedSignature); }
+    if sig_bytes.len() != 64 {
+        return Err(VerifyError::MalformedSignature);
+    }
     let mut arr = [0u8; 64];
     arr.copy_from_slice(&sig_bytes);
     let sig = Signature::from_bytes(&arr);
-    verifying_key.verify(body.as_bytes(), &sig).map_err(|_| VerifyError::SignatureInvalid)?;
+    verifying_key
+        .verify(body.as_bytes(), &sig)
+        .map_err(|_| VerifyError::SignatureInvalid)?;
     Ok(())
 }
 
@@ -131,10 +140,9 @@ impl std::fmt::Display for VerifyError {
     }
 }
 
-
 pub fn parse_cert_json(json: &str) -> Result<Certificate, String> {
-    let v: serde_json::Value = serde_json::from_str(json)
-        .map_err(|e| format!("invalid cert JSON: {}", e))?;
+    let v: serde_json::Value =
+        serde_json::from_str(json).map_err(|e| format!("invalid cert JSON: {}", e))?;
     let obj = v.as_object().ok_or("cert is not a JSON object")?;
 
     let s = |key: &str| -> Result<String, String> {
@@ -144,25 +152,40 @@ pub fn parse_cert_json(json: &str) -> Result<Certificate, String> {
             .ok_or_else(|| format!("missing or non-string field: {}", key))
     };
 
-    let version = obj.get("version")
+    let version = obj
+        .get("version")
         .and_then(|v| v.as_u64())
         .ok_or("missing or non-integer version")? as u32;
 
-    let preds = obj.get("preds")
+    let preds = obj
+        .get("preds")
         .and_then(|v| v.as_array())
         .ok_or("missing or non-array preds")?;
     let mut pred_proofs = Vec::new();
     for p in preds {
         let po = p.as_object().ok_or("pred entry is not an object")?;
         pred_proofs.push(ClauseProof {
-            clause_id: po.get("c").and_then(|v| v.as_str()).unwrap_or("0")
-                .parse::<usize>().unwrap_or(0),
-            verdict: po.get("v").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            note: po.get("n").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            clause_id: po
+                .get("c")
+                .and_then(|v| v.as_str())
+                .unwrap_or("0")
+                .parse::<usize>()
+                .unwrap_or(0),
+            verdict: po
+                .get("v")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            note: po
+                .get("n")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
         });
     }
 
-    let tcb_arr = obj.get("tcb")
+    let tcb_arr = obj
+        .get("tcb")
         .and_then(|v| v.as_array())
         .ok_or("missing or non-array tcb")?;
     let mut tcb = TcbManifest::default();
@@ -191,12 +214,17 @@ pub fn parse_cert_json(json: &str) -> Result<Certificate, String> {
 
 fn bytes_to_hex(b: &[u8]) -> String {
     let mut s = String::with_capacity(b.len() * 2);
-    for x in b { use std::fmt::Write; let _ = write!(&mut s, "{:02x}", x); }
+    for x in b {
+        use std::fmt::Write;
+        let _ = write!(&mut s, "{:02x}", x);
+    }
     s
 }
 
 fn hex_to_bytes(s: &str) -> Option<Vec<u8>> {
-    if s.len() % 2 != 0 { return None; }
+    if !s.len().is_multiple_of(2) {
+        return None;
+    }
     let mut out = Vec::with_capacity(s.len() / 2);
     let bytes = s.as_bytes();
     for i in (0..s.len()).step_by(2) {
@@ -227,13 +255,23 @@ mod tests {
         Node {
             name: Ident::new("t"),
             sig: TypeSig {
-                params: vec![Param { name: Ident::new("in"), ty: Type::Base(Ident::new("Int")) }],
+                params: vec![Param {
+                    name: Ident::new("in"),
+                    ty: Type::Base(Ident::new("Int")),
+                }],
                 ret: Type::Base(Ident::new("Int")),
             },
-            pre: vec![], post: vec![],
-            cx: CxSpec { bigo: CxExpr::Const, class: RuntimeClass::Idem },
-            sla: None, via: None,
-            auth: AuthLevel::None, scope_constraint: ScopeConstraint::Any, audit_req: AuditReq::None,
+            pre: vec![],
+            post: vec![],
+            cx: CxSpec {
+                bigo: CxExpr::Const,
+                class: RuntimeClass::Idem,
+            },
+            sla: None,
+            via: None,
+            auth: AuthLevel::None,
+            scope_constraint: ScopeConstraint::Any,
+            audit_req: AuditReq::None,
             state: vec![],
             deploy: None,
             span: Span::NONE,
@@ -244,7 +282,15 @@ mod tests {
     fn round_trip_sign_and_verify() {
         let (sk, vk) = new_keypair();
         let tcb = TcbManifest::default();
-        let c = emit(&trivial_node(), None, "ok", "O(1)", vec![], tcb.clone(), &sk);
+        let c = emit(
+            &trivial_node(),
+            None,
+            "ok",
+            "O(1)",
+            vec![],
+            tcb.clone(),
+            &sk,
+        );
         verify(&c, &vk, &tcb).unwrap();
     }
 
@@ -252,8 +298,16 @@ mod tests {
     fn tampered_cert_rejected() {
         let (sk, vk) = new_keypair();
         let tcb = TcbManifest::default();
-        let mut c = emit(&trivial_node(), None, "ok", "O(1)", vec![], tcb.clone(), &sk);
-        c.cx_derived = "O(n^2)".into(); 
+        let mut c = emit(
+            &trivial_node(),
+            None,
+            "ok",
+            "O(1)",
+            vec![],
+            tcb.clone(),
+            &sk,
+        );
+        c.cx_derived = "O(n^2)".into();
         let r = verify(&c, &vk, &tcb);
         assert!(matches!(r, Err(VerifyError::SignatureInvalid)));
     }
@@ -263,7 +317,15 @@ mod tests {
         let (sk, _vk) = new_keypair();
         let (_sk2, vk2) = new_keypair();
         let tcb = TcbManifest::default();
-        let c = emit(&trivial_node(), None, "ok", "O(1)", vec![], tcb.clone(), &sk);
+        let c = emit(
+            &trivial_node(),
+            None,
+            "ok",
+            "O(1)",
+            vec![],
+            tcb.clone(),
+            &sk,
+        );
         let r = verify(&c, &vk2, &tcb);
         assert!(matches!(r, Err(VerifyError::SignerMismatch)));
     }
@@ -273,8 +335,17 @@ mod tests {
         let (sk, vk) = new_keypair();
         let tcb = TcbManifest::default();
         let mut tcb2 = TcbManifest::default();
-        tcb2.components.push(("z3".into(), "deadbeef".into(), "4.13".into()));
-        let c = emit(&trivial_node(), None, "ok", "O(1)", vec![], tcb.clone(), &sk);
+        tcb2.components
+            .push(("z3".into(), "deadbeef".into(), "4.13".into()));
+        let c = emit(
+            &trivial_node(),
+            None,
+            "ok",
+            "O(1)",
+            vec![],
+            tcb.clone(),
+            &sk,
+        );
         let r = verify(&c, &vk, &tcb2);
         assert!(matches!(r, Err(VerifyError::TcbMismatch)));
     }

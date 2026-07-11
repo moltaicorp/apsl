@@ -1,4 +1,4 @@
-
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use axum::body::{to_bytes, Body};
@@ -8,18 +8,9 @@ use rand_core::OsRng;
 use serde_json::Value;
 use tower::ServiceExt;
 
-#[path = "../src/pipeline.rs"]
-mod pipeline;
-#[path = "../src/nix.rs"]
-mod nix;
-#[path = "../src/handlers.rs"]
-mod handlers;
+use apsl_workbench::{handlers, router, AppState};
 
-struct AppState {
-    key: SigningKey,
-    store_base: std::path::PathBuf,
-}
-
+static STATE_ID: AtomicU64 = AtomicU64::new(0);
 
 const DEDUPE: &str = r#"
 type Email = String
@@ -35,20 +26,17 @@ graph email_pipeline : String[] -> MessageId[]
   flow  in -> normalize -> dedupe -> out
 "#;
 
-fn state() -> Arc<crate::AppState> {
-    Arc::new(crate::AppState {
+fn state() -> Arc<AppState> {
+    let id = STATE_ID.fetch_add(1, Ordering::Relaxed);
+    Arc::new(AppState {
         key: SigningKey::generate(&mut OsRng),
-        store_base: std::env::temp_dir().join("wb-test-certstore"),
+        store_base: std::env::temp_dir()
+            .join(format!("wb-test-certstore-{}-{id}", std::process::id())),
     })
 }
 
-fn app(st: Arc<crate::AppState>) -> axum::Router {
-    use axum::routing::{get, post};
-    axum::Router::new()
-        .route("/healthz", get(handlers::healthz))
-        .route("/compile", post(handlers::compile))
-        .route("/verify", post(handlers::verify))
-        .with_state(st)
+fn app(st: Arc<AppState>) -> axum::Router {
+    router(st)
 }
 
 async fn body_json(resp: axum::response::Response) -> Value {
@@ -65,17 +53,13 @@ async fn healthz_reports_self() {
     assert_eq!(resp.status(), StatusCode::OK);
     let v = body_json(resp).await;
     assert_eq!(v["service"], "apsl-workbench");
-    assert_eq!(v["specified_by"], "workbench.apsl");
+    assert_eq!(v["specified_by"], "apsl.apsl");
 }
 
 #[tokio::test]
 async fn compile_emits_per_node_certs() {
     let resp = app(state())
-        .oneshot(
-            Request::post("/compile")
-                .body(Body::from(DEDUPE))
-                .unwrap(),
-        )
+        .oneshot(Request::post("/compile").body(Body::from(DEDUPE)).unwrap())
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -107,6 +91,21 @@ async fn compile_rejects_garbage_with_422() {
 }
 
 #[tokio::test]
+async fn compile_rejects_counterexample_without_storing_certificates() {
+    let state = state();
+    let store = state.store_base.clone();
+    let source = "n : Int -> Int\n  post out != out\n  cx O(1) idem\n";
+    let resp = app(state)
+        .oneshot(Request::post("/compile").body(Body::from(source)).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let value = body_json(resp).await;
+    assert_eq!(value["stage"], "predicate");
+    assert!(!store.exists());
+}
+
+#[tokio::test]
 async fn verify_identity_satisfies_when_post_covers_pre() {
     let req = serde_json::json!({
         "pre": [[0.0, 1.0]],
@@ -126,15 +125,30 @@ async fn verify_identity_satisfies_when_post_covers_pre() {
     assert_eq!(v["verdict"]["satisfies"], true, "{v}");
 }
 
+#[tokio::test]
+async fn verify_rejects_mismatched_box_arity() {
+    let req = serde_json::json!({
+        "pre": [[0.0, 1.0], [0.0, 1.0]],
+        "post": [[0.0, 1.0]]
+    });
+    let resp = app(state())
+        .oneshot(
+            Request::post("/verify")
+                .header("content-type", "application/json")
+                .body(Body::from(req.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let value = body_json(resp).await;
+    assert_eq!(value["ok"], false);
+}
 
 fn fake_node_store(tag: &str, name: &str, body: &str) -> std::path::PathBuf {
     use std::os::unix::fs::PermissionsExt;
-    let dir = std::env::temp_dir().join(format!(
-        "wb-jac-{}-{}-{}",
-        std::process::id(),
-        tag,
-        name
-    ));
+    let dir = std::env::temp_dir().join(format!("wb-jac-{}-{}-{}", std::process::id(), tag, name));
     let bin = dir.join("bin");
     std::fs::create_dir_all(&bin).unwrap();
     let f = bin.join(name);
@@ -164,7 +178,11 @@ async fn jacobian_verifies_numeric_node_against_store_binary() {
 double : Int -> Int
   cx    O(n)
 "#;
-    let dir = fake_node_store("violate", "double", "read x; awk -v x=$x 'BEGIN{print 2*x}'");
+    let dir = fake_node_store(
+        "violate",
+        "double",
+        "read x; awk -v x=$x 'BEGIN{print 2*x}'",
+    );
     let mut manifest = std::collections::HashMap::new();
     manifest.insert("double".to_string(), dir.to_string_lossy().to_string());
     let boxes = std::collections::HashMap::new();

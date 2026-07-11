@@ -1,4 +1,3 @@
-
 use std::fmt;
 
 use apsl_core::ast::{BinOp, Expr, Ident, Lit, Node, Quant, Span, Type, UnOp};
@@ -10,7 +9,9 @@ pub trait TypeOracle {
 pub struct EmptyTypeOracle;
 
 impl TypeOracle for EmptyTypeOracle {
-    fn type_of(&self, _span: &Span) -> Option<Type> { None }
+    fn type_of(&self, _span: &Span) -> Option<Type> {
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -19,7 +20,9 @@ pub struct Smt2Script {
 }
 
 impl fmt::Display for Smt2Script {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(&self.text) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.text)
+    }
 }
 
 pub fn encode_vc(node: &Node, _types: &dyn TypeOracle) -> Smt2Script {
@@ -75,7 +78,9 @@ struct Ctx {
 }
 
 impl Ctx {
-    fn new() -> Self { Self { fresh: 0 } }
+    fn new() -> Self {
+        Self { fresh: 0 }
+    }
 }
 
 fn sym(id: &Ident) -> String {
@@ -106,7 +111,11 @@ fn pred_head(arg: &Expr, ctx: &mut Ctx) -> String {
 fn encode_lit(l: &Lit) -> String {
     match l {
         Lit::Int(n) => {
-            if *n < 0 { format!("(- {})", -n) } else { format!("{}", n) }
+            if *n < 0 {
+                format!("(- {})", -n)
+            } else {
+                format!("{}", n)
+            }
         }
         Lit::Rat(p, q) => format!("(/ {} {})", p, q),
         Lit::Bool(true) => "true".into(),
@@ -130,7 +139,12 @@ fn encode_expr(e: &Expr, ctx: &mut Ctx) -> String {
                     format!("({} {})", pred_name(name), encode_expr(&args[0], ctx))
                 }
                 "subseteq?" if args.len() == 2 => {
-                    format!("({} {} {})", pred_name(name), encode_expr(&args[0], ctx), encode_expr(&args[1], ctx))
+                    format!(
+                        "({} {} {})",
+                        pred_name(name),
+                        encode_expr(&args[0], ctx),
+                        encode_expr(&args[1], ctx)
+                    )
                 }
                 "every" if args.len() == 2 => {
                     format!(
@@ -178,14 +192,22 @@ fn encode_expr(e: &Expr, ctx: &mut Ctx) -> String {
                 BinOp::Union => "union_p",
                 BinOp::Intersect => "intersect_p",
             };
-            format!("({} {} {})", opstr, encode_expr(l, ctx), encode_expr(r, ctx))
+            format!(
+                "({} {} {})",
+                opstr,
+                encode_expr(l, ctx),
+                encode_expr(r, ctx)
+            )
         }
         Expr::Un(op, e, _) => match op {
             UnOp::Not => format!("(not {})", encode_expr(e, ctx)),
             UnOp::Neg => format!("(- {})", encode_expr(e, ctx)),
         },
         Expr::Quant(q, x, dom, body, _) => {
-            let qkw = match q { Quant::Forall => "forall", Quant::Exists => "exists" };
+            let qkw = match q {
+                Quant::Forall => "forall",
+                Quant::Exists => "exists",
+            };
             ctx.fresh += 1;
             let idx = format!("i{}", ctx.fresh);
             let dom_str = encode_expr(dom, ctx);
@@ -197,21 +219,26 @@ fn encode_expr(e: &Expr, ctx: &mut Ctx) -> String {
         }
         Expr::If(c, a, b, _) => format!(
             "(ite {} {} {})",
-            encode_expr(c, ctx), encode_expr(a, ctx), encode_expr(b, ctx)
+            encode_expr(c, ctx),
+            encode_expr(a, ctx),
+            encode_expr(b, ctx)
         ),
         Expr::Let(x, e, body, _) => format!(
             "(let ((|{}| {})) {})",
-            x.as_str(), encode_expr(e, ctx), encode_expr(body, ctx)
+            x.as_str(),
+            encode_expr(e, ctx),
+            encode_expr(body, ctx)
         ),
         Expr::Tuple(es, _) => {
             let mut s = String::from("(tuple");
-            for e in es { s.push(' '); s.push_str(&encode_expr(e, ctx)); }
+            for e in es {
+                s.push(' ');
+                s.push_str(&encode_expr(e, ctx));
+            }
             s.push(')');
             s
         }
-        Expr::Lam(_, _, _) => {
-            "true".into()
-        }
+        Expr::Lam(_, _, _) => "true".into(),
     }
 }
 
@@ -224,14 +251,23 @@ mod tests {
         Node {
             name: Ident::new("t"),
             sig: TypeSig {
-                params: vec![Param { name: Ident::new("in"), ty: Type::Base(Ident::new("Int")) }],
+                params: vec![Param {
+                    name: Ident::new("in"),
+                    ty: Type::Base(Ident::new("Int")),
+                }],
                 ret: Type::Base(Ident::new("Int")),
             },
             pre: vec![],
             post: vec![Expr::Lit(Lit::Bool(true), Span::NONE)],
-            cx: CxSpec { bigo: CxExpr::Const, class: RuntimeClass::Idem },
-            sla: None, via: None,
-            auth: AuthLevel::None, scope_constraint: ScopeConstraint::Any, audit_req: AuditReq::None,
+            cx: CxSpec {
+                bigo: CxExpr::Const,
+                class: RuntimeClass::Idem,
+            },
+            sla: None,
+            via: None,
+            auth: AuthLevel::None,
+            scope_constraint: ScopeConstraint::Any,
+            audit_req: AuditReq::None,
             state: vec![],
             deploy: None,
             span: Span::NONE,

@@ -1,4 +1,3 @@
-
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
@@ -124,8 +123,7 @@ pub fn search_symbol(symbol: &str, files: &[PathBuf]) -> Vec<Located> {
 fn matches_definition(line: &str, symbol: &str) -> bool {
     if let Some(rest) = line.strip_prefix("type ") {
         let rest = rest.trim_start();
-        if rest.starts_with(symbol) {
-            let after = &rest[symbol.len()..];
+        if let Some(after) = rest.strip_prefix(symbol) {
             let after = after.trim_start();
             if after.starts_with('=') || after.is_empty() {
                 return true;
@@ -136,8 +134,7 @@ fn matches_definition(line: &str, symbol: &str) -> bool {
 
     if let Some(rest) = line.strip_prefix("graph ") {
         let rest = rest.trim_start();
-        if rest.starts_with(symbol) {
-            let after = &rest[symbol.len()..];
+        if let Some(after) = rest.strip_prefix(symbol) {
             let after = after.trim_start();
             if after.starts_with(':') || after.is_empty() {
                 return true;
@@ -146,8 +143,7 @@ fn matches_definition(line: &str, symbol: &str) -> bool {
         return false;
     }
 
-    if line.starts_with(symbol) {
-        let after = &line[symbol.len()..];
+    if let Some(after) = line.strip_prefix(symbol) {
         let after = after.trim_start();
         if after.starts_with(':') {
             return true;
@@ -205,26 +201,44 @@ mod tests {
     fn match_node() {
         assert!(matches_definition("dedupe : Email[] -> Email[]", "dedupe"));
         assert!(matches_definition("dedupe: Email[] -> Email[]", "dedupe"));
-        assert!(!matches_definition("  dedupe : Email[] -> Email[]", "dedupe"));
-        assert!(!matches_definition("dedupe_v2 : Email[] -> Email[]", "dedupe"));
+        assert!(!matches_definition(
+            "  dedupe : Email[] -> Email[]",
+            "dedupe"
+        ));
+        assert!(!matches_definition(
+            "dedupe_v2 : Email[] -> Email[]",
+            "dedupe"
+        ));
     }
 
     #[test]
     fn match_graph() {
-        assert!(matches_definition("graph email_pipeline : String[] -> MessageId[]", "email_pipeline"));
-        assert!(!matches_definition("graph email_pipeline : String[] -> MessageId[]", "email"));
+        assert!(matches_definition(
+            "graph email_pipeline : String[] -> MessageId[]",
+            "email_pipeline"
+        ));
+        assert!(!matches_definition(
+            "graph email_pipeline : String[] -> MessageId[]",
+            "email"
+        ));
     }
 
     #[test]
     fn match_predicate() {
-        assert!(matches_definition("valid_email? : String -> Bool", "valid_email?"));
+        assert!(matches_definition(
+            "valid_email? : String -> Bool",
+            "valid_email?"
+        ));
     }
 
     #[test]
     fn extract_block_basic() {
         let src = "type Email = String\n\ndedupe : Email[] -> Email[]\n  pre   every in valid_email?\n  cx    O(n log n) idem\n\ngraph p : X -> Y\n";
         let block = extract_block(src, 2);
-        assert_eq!(block, "dedupe : Email[] -> Email[]\n  pre   every in valid_email?\n  cx    O(n log n) idem");
+        assert_eq!(
+            block,
+            "dedupe : Email[] -> Email[]\n  pre   every in valid_email?\n  cx    O(n log n) idem"
+        );
     }
 
     #[test]

@@ -1,4 +1,3 @@
-
 use apsl_core::ast::CxExpr;
 
 use crate::algebra::{normalize, Weight};
@@ -23,7 +22,7 @@ pub fn hint_for_status(s: &NodeStatus) -> String {
 pub fn classify(e: &CxExpr) -> HintKind {
     let poly = normalize(e);
     for t in &poly {
-        for (_, w) in &t.factors {
+        for w in t.factors.values() {
             if *w > Weight::NLogN {
                 return HintKind::NestedIteration;
             }

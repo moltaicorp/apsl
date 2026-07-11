@@ -1,4 +1,3 @@
-
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -18,7 +17,10 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     }
     match args[1].as_str() {
-        "help" | "--help" | "-h" => { usage(); ExitCode::SUCCESS }
+        "help" | "--help" | "-h" => {
+            usage();
+            ExitCode::SUCCESS
+        }
         "key" => key_cmd(&args[2..]),
         "emit" => emit_cmd(&args[2..]),
         "verify" => verify_cmd(&args[2..]),
@@ -35,8 +37,12 @@ fn usage() {
     eprintln!("apsl-cert — APSL certificate analyzer\n");
     eprintln!("usage:");
     eprintln!("  apsl-cert key new <name>             generate Ed25519 keypair");
-    eprintln!("  apsl-cert emit <file> --key <name>   verify file, emit signed cert per node, store");
-    eprintln!("  apsl-cert verify <hash> --pub <name>  verify a stored cert (default: loads <name>.pub)");
+    eprintln!(
+        "  apsl-cert emit <file> --key <name>   verify file, emit signed cert per node, store"
+    );
+    eprintln!(
+        "  apsl-cert verify <hash> --pub <name>  verify a stored cert (default: loads <name>.pub)"
+    );
     eprintln!("  apsl-cert verify <hash> --key <name>  verify (alias for --pub, loads <name>.pub)");
     eprintln!("  apsl-cert show <hash>                pretty-print a stored cert");
     eprintln!();
@@ -67,11 +73,17 @@ fn parse_named_arg<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
 fn emit_cmd(rest: &[String]) -> ExitCode {
     let file = match rest.first() {
         Some(s) if !s.starts_with("--") => s,
-        _ => { eprintln!("apsl-cert emit: usage: apsl-cert emit <file> --key <name>"); return ExitCode::from(2); }
+        _ => {
+            eprintln!("apsl-cert emit: usage: apsl-cert emit <file> --key <name>");
+            return ExitCode::from(2);
+        }
     };
     let key_name = match parse_named_arg(rest, "--key") {
         Some(k) => k,
-        None => { eprintln!("apsl-cert emit: --key <name> required"); return ExitCode::from(2); }
+        None => {
+            eprintln!("apsl-cert emit: --key <name> required");
+            return ExitCode::from(2);
+        }
     };
     let store_base = PathBuf::from(parse_named_arg(rest, "--store").unwrap_or(".apsl-store"));
     let impl_hash = parse_named_arg(rest, "--impl-hash");
@@ -79,16 +91,31 @@ fn emit_cmd(rest: &[String]) -> ExitCode {
 
     let src = match std::fs::read_to_string(file) {
         Ok(s) => s,
-        Err(e) => { eprintln!("apsl-cert emit: cannot read {}: {}", file, e); return ExitCode::from(2); }
+        Err(e) => {
+            eprintln!("apsl-cert emit: cannot read {}: {}", file, e);
+            return ExitCode::from(2);
+        }
     };
-    let prog = match parse_str(&src) {
+    let parsed = match parse_str(&src) {
         Ok(p) => p,
-        Err(e) => { eprintln!("apsl-cert emit: parse error\n  {}", e); return ExitCode::FAILURE; }
+        Err(e) => {
+            eprintln!("apsl-cert emit: parse error\n  {}", e);
+            return ExitCode::FAILURE;
+        }
+    };
+    let prog = match apsl_link::link(&parsed, std::path::Path::new(file), &[]) {
+        Ok(result) => result.program,
+        Err(e) => {
+            eprintln!("{}", e);
+            return ExitCode::FAILURE;
+        }
     };
     let tp = match type_check(&prog) {
         Ok(t) => t,
         Err(errs) => {
-            for e in errs { eprintln!("apsl-cert emit: type error\n  {}", e); }
+            for e in errs {
+                eprintln!("apsl-cert emit: type error\n  {}", e);
+            }
             return ExitCode::FAILURE;
         }
     };
@@ -97,11 +124,14 @@ fn emit_cmd(rest: &[String]) -> ExitCode {
     let sk_path = PathBuf::from(format!("{}.priv", key_name));
     let sk = match load_keypair(&sk_path) {
         Ok(k) => k,
-        Err(e) => { eprintln!("apsl-cert emit: load key: {}", e); return ExitCode::FAILURE; }
+        Err(e) => {
+            eprintln!("apsl-cert emit: load key: {}", e);
+            return ExitCode::FAILURE;
+        }
     };
     let tcb = pinned_tcb();
 
-    let mut emitted = 0;
+    let mut certificates = Vec::new();
     for d in &tp.program.decls {
         if let apsl_core::ast::Decl::Node(n) = d {
             let cx_entry = cx_report.per_node.iter().find(|r| r.node == n.name);
@@ -117,36 +147,88 @@ fn emit_cmd(rest: &[String]) -> ExitCode {
                 None => ("ok".into(), "O(1)".into()),
             };
             if verdict == "exceeds" {
-                eprintln!("apsl-cert emit: refusing to certify {} (complexity exceeds O(n log n))", n.name);
+                eprintln!(
+                    "apsl-cert emit: refusing to certify {} (complexity exceeds O(n log n))",
+                    n.name
+                );
                 return ExitCode::FAILURE;
             }
             let dr = discharge_node(n, &EmptyTypeOracle, &*solver);
-            let proofs: Vec<ClauseProof> = dr.per_clause.iter().map(|c| {
-                let (verdict, note) = match &c.status {
-                    ClauseStatus::Proved => ("proved", String::new()),
-                    ClauseStatus::Counterexample(_) => ("cex", "counterexample reported".into()),
-                    ClauseStatus::Unknown(m) => ("unknown", m.clone()),
-                    ClauseStatus::EncodingError(m) => ("error", m.clone()),
-                };
-                ClauseProof { clause_id: c.clause_id, verdict: verdict.into(), note }
-            }).collect();
+            for clause in &dr.per_clause {
+                match &clause.status {
+                    ClauseStatus::Proved => {}
+                    ClauseStatus::Counterexample(_) => {
+                        eprintln!(
+                            "apsl-cert emit: refusing to certify {} clause {} (counterexample)",
+                            n.name, clause.clause_id
+                        );
+                        return ExitCode::FAILURE;
+                    }
+                    ClauseStatus::Unknown(message) => {
+                        eprintln!(
+                            "apsl-cert emit: refusing to certify {} clause {} (unknown: {})",
+                            n.name, clause.clause_id, message
+                        );
+                        return ExitCode::FAILURE;
+                    }
+                    ClauseStatus::EncodingError(message) => {
+                        eprintln!(
+                            "apsl-cert emit: refusing to certify {} clause {} (encoding error: {})",
+                            n.name, clause.clause_id, message
+                        );
+                        return ExitCode::FAILURE;
+                    }
+                }
+            }
+            let proofs: Vec<ClauseProof> = dr
+                .per_clause
+                .iter()
+                .map(|c| {
+                    let (verdict, note) = match &c.status {
+                        ClauseStatus::Proved => ("proved", String::new()),
+                        ClauseStatus::Counterexample(_) => {
+                            ("cex", "counterexample reported".into())
+                        }
+                        ClauseStatus::Unknown(m) => ("unknown", m.clone()),
+                        ClauseStatus::EncodingError(m) => ("error", m.clone()),
+                    };
+                    ClauseProof {
+                        clause_id: c.clause_id,
+                        verdict: verdict.into(),
+                        note,
+                    }
+                })
+                .collect();
             let node_impl_hash = match impl_node {
                 Some(target) if n.name.as_str() == target => impl_hash,
                 Some(_) => None,
                 None => impl_hash,
             };
-            let cert = emit(n, node_impl_hash, &verdict, &derived, proofs, tcb.clone(), &sk);
-            let hash = match put(&cert, &store_base) {
-                Ok(h) => h,
-                Err(e) => { eprintln!("apsl-cert emit: store: {}", e); return ExitCode::FAILURE; }
-            };
-            println!("{}  {}", hash, n.name);
-            emitted += 1;
+            let cert = emit(
+                n,
+                node_impl_hash,
+                &verdict,
+                &derived,
+                proofs,
+                tcb.clone(),
+                &sk,
+            );
+            certificates.push((n.name.as_str().to_string(), cert));
         }
     }
-    if emitted == 0 {
+    if certificates.is_empty() {
         eprintln!("apsl-cert emit: no nodes in {}", file);
         return ExitCode::FAILURE;
+    }
+    for (node_name, cert) in certificates {
+        let hash = match put(&cert, &store_base) {
+            Ok(h) => h,
+            Err(e) => {
+                eprintln!("apsl-cert emit: store: {}", e);
+                return ExitCode::FAILURE;
+            }
+        };
+        println!("{}  {}", hash, node_name);
     }
     ExitCode::SUCCESS
 }
@@ -165,11 +247,17 @@ fn verify_cmd(rest: &[String]) -> ExitCode {
 
     let cert_json = match get(&hash, &store_base) {
         Ok(b) => b,
-        Err(e) => { eprintln!("apsl-cert verify: {}", e); return ExitCode::FAILURE; }
+        Err(e) => {
+            eprintln!("apsl-cert verify: {}", e);
+            return ExitCode::FAILURE;
+        }
     };
     let cert = match parse_cert_json(&cert_json) {
         Ok(c) => c,
-        Err(e) => { eprintln!("apsl-cert verify: {}", e); return ExitCode::FAILURE; }
+        Err(e) => {
+            eprintln!("apsl-cert verify: {}", e);
+            return ExitCode::FAILURE;
+        }
     };
 
     let vk = {
@@ -195,7 +283,9 @@ fn verify_cmd(rest: &[String]) -> ExitCode {
 
     let expected_tcb = pinned_tcb();
     match verify(&cert, &vk, &expected_tcb) {
-        Ok(()) => { println!("ok: Ed25519 signature verified, TCB matches"); }
+        Ok(()) => {
+            println!("ok: Ed25519 signature verified, TCB matches");
+        }
         Err(e) => {
             eprintln!("apsl-cert verify: FAILED — {:?}", e);
             return ExitCode::FAILURE;
@@ -207,20 +297,26 @@ fn verify_cmd(rest: &[String]) -> ExitCode {
 fn show_cmd(rest: &[String]) -> ExitCode {
     let hash = match rest.first() {
         Some(s) => s,
-        None => { eprintln!("apsl-cert show: usage: apsl-cert show <hash>"); return ExitCode::from(2); }
+        None => {
+            eprintln!("apsl-cert show: usage: apsl-cert show <hash>");
+            return ExitCode::from(2);
+        }
     };
     let store_base = PathBuf::from(parse_named_arg(rest, "--store").unwrap_or(".apsl-store"));
     let bytes = match get(hash, &store_base) {
         Ok(b) => b,
-        Err(e) => { eprintln!("apsl-cert show: {}", e); return ExitCode::FAILURE; }
+        Err(e) => {
+            eprintln!("apsl-cert show: {}", e);
+            return ExitCode::FAILURE;
+        }
     };
     println!("{}", bytes);
     ExitCode::SUCCESS
 }
 
 fn render_cx(e: &apsl_core::ast::CxExpr) -> String {
-    use apsl_core::ast::CxExpr::*;
     use apsl_complex::{dominant_weight, Weight};
+    use apsl_core::ast::CxExpr::*;
     fn r(e: &apsl_core::ast::CxExpr) -> String {
         match e {
             Const => "1".into(),
@@ -228,19 +324,27 @@ fn render_cx(e: &apsl_core::ast::CxExpr) -> String {
             LogN(n) => format!("log {}", n.as_str()),
             NLogN(n) => format!("{} log {}", n.as_str(), n.as_str()),
             Sum(es) => {
-                let top = es.iter().map(|x| dominant_weight(x)).max().unwrap_or(Weight::Const);
-                let mut keep: Vec<&apsl_core::ast::CxExpr> = es.iter().filter(|x| dominant_weight(x) == top).collect();
+                let top = es
+                    .iter()
+                    .map(dominant_weight)
+                    .max()
+                    .unwrap_or(Weight::Const);
+                let mut keep: Vec<&apsl_core::ast::CxExpr> =
+                    es.iter().filter(|x| dominant_weight(x) == top).collect();
                 keep.dedup_by(|a, b| std::ptr::eq(*a, *b));
                 let strs: Vec<String> = keep.iter().map(|x| r(x)).collect();
                 strs.join(" + ")
             }
             Prod(es) => {
-                let mut strs: Vec<String> = es.iter().filter(|x| !matches!(x, Const)).map(|x| r(x)).collect();
-                if strs.is_empty() { strs.push("1".into()); }
+                let mut strs: Vec<String> =
+                    es.iter().filter(|x| !matches!(x, Const)).map(r).collect();
+                if strs.is_empty() {
+                    strs.push("1".into());
+                }
                 strs.join(" * ")
             }
             Max(es) => {
-                let strs: Vec<String> = es.iter().map(|x| r(x)).collect();
+                let strs: Vec<String> = es.iter().map(r).collect();
                 format!("max({})", strs.join(", "))
             }
         }

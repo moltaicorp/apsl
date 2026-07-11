@@ -1,8 +1,9 @@
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use apsl_core::ast::{Ident, Type as AstType};
+#[cfg(test)]
+use apsl_core::ast::Ident;
+use apsl_core::ast::Type as AstType;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Ty {
@@ -25,13 +26,25 @@ impl Ty {
 
     fn collect_vars(&self, out: &mut BTreeSet<u32>) {
         match self {
-            Ty::Var(v) => { out.insert(*v); }
+            Ty::Var(v) => {
+                out.insert(*v);
+            }
             Ty::Base(_) | Ty::Parameterized(..) => {}
             Ty::List(t) | Ty::Result(t) => t.collect_vars(out),
-            Ty::Tuple(ts) => { for t in ts { t.collect_vars(out); } }
-            Ty::Record(fs) => { for (_, t) in fs { t.collect_vars(out); } }
+            Ty::Tuple(ts) => {
+                for t in ts {
+                    t.collect_vars(out);
+                }
+            }
+            Ty::Record(fs) => {
+                for (_, t) in fs {
+                    t.collect_vars(out);
+                }
+            }
             Ty::Fun(args, ret) => {
-                for a in args { a.collect_vars(out); }
+                for a in args {
+                    a.collect_vars(out);
+                }
                 ret.collect_vars(out);
             }
         }
@@ -45,7 +58,9 @@ impl fmt::Display for Ty {
             Ty::Parameterized(n, args) => {
                 write!(f, "{}<", n)?;
                 for (i, a) in args.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", a)?;
                 }
                 write!(f, ">")
@@ -54,7 +69,9 @@ impl fmt::Display for Ty {
             Ty::Tuple(ts) => {
                 write!(f, "(")?;
                 for (i, t) in ts.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", t)?;
                 }
                 write!(f, ")")
@@ -62,7 +79,9 @@ impl fmt::Display for Ty {
             Ty::Record(fs) => {
                 write!(f, "{{ ")?;
                 for (i, (name, t)) in fs.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}: {}", name, t)?;
                 }
                 write!(f, " }}")
@@ -71,7 +90,9 @@ impl fmt::Display for Ty {
             Ty::Fun(args, ret) => {
                 write!(f, "(")?;
                 for (i, a) in args.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", a)?;
                 }
                 write!(f, ") -> {}", ret)
@@ -92,12 +113,22 @@ pub fn ast_type_to_ty(t: &AstType, aliases: &BTreeMap<String, AstType>) -> Ty {
         }
         AstType::List(inner) => Ty::List(Box::new(ast_type_to_ty(inner, aliases))),
         AstType::Tuple(ts) => Ty::Tuple(ts.iter().map(|t| ast_type_to_ty(t, aliases)).collect()),
-        AstType::Record(fs) => Ty::Record(fs.iter().map(|(name, t)| (name.as_str().to_string(), Box::new(ast_type_to_ty(t, aliases)))).collect()),
+        AstType::Record(fs) => Ty::Record(
+            fs.iter()
+                .map(|(name, t)| {
+                    (
+                        name.as_str().to_string(),
+                        Box::new(ast_type_to_ty(t, aliases)),
+                    )
+                })
+                .collect(),
+        ),
         AstType::Var(v) => Ty::Var(*v),
         AstType::Result(inner) => Ty::Result(Box::new(ast_type_to_ty(inner, aliases))),
-        AstType::Parameterized(name, args) => {
-            Ty::Parameterized(name.as_str().to_string(), args.iter().map(|a| ast_type_to_ty(a, aliases)).collect())
-        }
+        AstType::Parameterized(name, args) => Ty::Parameterized(
+            name.as_str().to_string(),
+            args.iter().map(|a| ast_type_to_ty(a, aliases)).collect(),
+        ),
     }
 }
 
@@ -108,7 +139,12 @@ pub struct Scheme {
 }
 
 impl Scheme {
-    pub fn mono(t: Ty) -> Self { Scheme { vars: Vec::new(), body: t } }
+    pub fn mono(t: Ty) -> Self {
+        Scheme {
+            vars: Vec::new(),
+            body: t,
+        }
+    }
 }
 
 impl fmt::Display for Scheme {
@@ -117,17 +153,23 @@ impl fmt::Display for Scheme {
             write!(f, "{}", self.body)
         } else {
             write!(f, "forall")?;
-            for v in &self.vars { write!(f, " ?t{}", v)?; }
+            for v in &self.vars {
+                write!(f, " ?t{}", v)?;
+            }
             write!(f, ". {}", self.body)
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct TyGen { next: u32 }
+pub struct TyGen {
+    next: u32,
+}
 
 impl TyGen {
-    pub fn new() -> Self { TyGen { next: 1_000_000 } }
+    pub fn new() -> Self {
+        TyGen { next: 1_000_000 }
+    }
     pub fn fresh(&mut self) -> Ty {
         let v = self.next;
         self.next += 1;
@@ -135,13 +177,21 @@ impl TyGen {
     }
 }
 
-impl Default for TyGen { fn default() -> Self { Self::new() } }
+impl Default for TyGen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[derive(Debug, Clone, Default)]
-pub struct Subst { map: BTreeMap<u32, Ty> }
+pub struct Subst {
+    map: BTreeMap<u32, Ty>,
+}
 
 impl Subst {
-    pub fn new() -> Self { Subst::default() }
+    pub fn new() -> Self {
+        Subst::default()
+    }
 
     pub fn apply(&self, t: &Ty) -> Ty {
         match t {
@@ -156,7 +206,11 @@ impl Subst {
             Ty::List(inner) => Ty::List(Box::new(self.apply(inner))),
             Ty::Result(inner) => Ty::Result(Box::new(self.apply(inner))),
             Ty::Tuple(ts) => Ty::Tuple(ts.iter().map(|x| self.apply(x)).collect()),
-            Ty::Record(fs) => Ty::Record(fs.iter().map(|(n, t)| (n.clone(), Box::new(self.apply(t)))).collect()),
+            Ty::Record(fs) => Ty::Record(
+                fs.iter()
+                    .map(|(n, t)| (n.clone(), Box::new(self.apply(t))))
+                    .collect(),
+            ),
             Ty::Fun(args, ret) => Ty::Fun(
                 args.iter().map(|x| self.apply(x)).collect(),
                 Box::new(self.apply(ret)),
@@ -175,8 +229,12 @@ impl Subst {
         out
     }
 
-    pub fn insert(&mut self, v: u32, t: Ty) { self.map.insert(v, t); }
-    pub fn is_empty(&self) -> bool { self.map.is_empty() }
+    pub fn insert(&mut self, v: u32, t: Ty) {
+        self.map.insert(v, t);
+    }
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
 }
 
 pub fn unify(a: &Ty, b: &Ty) -> Result<Subst, UnifyError> {
@@ -184,7 +242,9 @@ pub fn unify(a: &Ty, b: &Ty) -> Result<Subst, UnifyError> {
         (Ty::Var(x), Ty::Var(y)) if x == y => Ok(Subst::new()),
         (Ty::Var(x), other) | (other, Ty::Var(x)) => bind(*x, other),
         (Ty::Base(x), Ty::Base(y)) if x == y => Ok(Subst::new()),
-        (Ty::Parameterized(na, aa), Ty::Parameterized(nb, ab)) if na == nb && aa.len() == ab.len() => {
+        (Ty::Parameterized(na, aa), Ty::Parameterized(nb, ab))
+            if na == nb && aa.len() == ab.len() =>
+        {
             let mut s = Subst::new();
             for (x, y) in aa.iter().zip(ab.iter()) {
                 let x2 = s.apply(x);
@@ -238,7 +298,9 @@ pub fn unify(a: &Ty, b: &Ty) -> Result<Subst, UnifyError> {
 
 fn bind(v: u32, t: &Ty) -> Result<Subst, UnifyError> {
     if let Ty::Var(w) = t {
-        if *w == v { return Ok(Subst::new()); }
+        if *w == v {
+            return Ok(Subst::new());
+        }
     }
     if t.free_vars().contains(&v) {
         return Err(UnifyError::OccursCheck(v, t.clone()));
@@ -249,7 +311,9 @@ fn bind(v: u32, t: &Ty) -> Result<Subst, UnifyError> {
 }
 
 pub fn instantiate(scheme: &Scheme, gen: &mut TyGen) -> Ty {
-    if scheme.vars.is_empty() { return scheme.body.clone(); }
+    if scheme.vars.is_empty() {
+        return scheme.body.clone();
+    }
     let mut s = Subst::new();
     for v in &scheme.vars {
         let fresh = gen.fresh();
@@ -268,12 +332,16 @@ impl fmt::Display for UnifyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             UnifyError::Mismatch(a, b) => write!(f, "cannot unify {} with {}", a, b),
-            UnifyError::OccursCheck(v, t) => write!(f, "occurs check failed: ?t{} appears in {}", v, t),
+            UnifyError::OccursCheck(v, t) => {
+                write!(f, "occurs check failed: ?t{} appears in {}", v, t)
+            }
         }
     }
 }
 
-pub fn parse_signature_string(_s: &str) -> Option<Scheme> { None }
+pub fn parse_signature_string(_s: &str) -> Option<Scheme> {
+    None
+}
 
 pub type Env = BTreeMap<String, Scheme>;
 

@@ -1,4 +1,3 @@
-
 use std::io::{Read, Write};
 use std::path::Path;
 
@@ -32,12 +31,16 @@ pub fn save_keypair(name: &str, sk: &SigningKey) -> std::io::Result<()> {
 pub fn load_keypair(priv_path: &Path) -> std::io::Result<SigningKey> {
     let mut s = String::new();
     std::fs::File::open(priv_path)?.read_to_string(&mut s)?;
-    let bytes = unhex(s.trim()).ok_or_else(|| std::io::Error::new(
-        std::io::ErrorKind::InvalidData, "private-key file is not hex",
-    ))?;
+    let bytes = unhex(s.trim()).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "private-key file is not hex",
+        )
+    })?;
     if bytes.len() != SECRET_KEY_LENGTH {
         return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData, "private-key wrong length",
+            std::io::ErrorKind::InvalidData,
+            "private-key wrong length",
         ));
     }
     let mut arr = [0u8; SECRET_KEY_LENGTH];
@@ -48,19 +51,26 @@ pub fn load_keypair(priv_path: &Path) -> std::io::Result<SigningKey> {
 pub fn load_public(pub_path: &Path) -> std::io::Result<VerifyingKey> {
     let mut s = String::new();
     std::fs::File::open(pub_path)?.read_to_string(&mut s)?;
-    let bytes = unhex(s.trim()).ok_or_else(|| std::io::Error::new(
-        std::io::ErrorKind::InvalidData, "public-key file is not hex",
-    ))?;
+    let bytes = unhex(s.trim()).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "public-key file is not hex",
+        )
+    })?;
     if bytes.len() != 32 {
         return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData, "public-key wrong length",
+            std::io::ErrorKind::InvalidData,
+            "public-key wrong length",
         ));
     }
     let mut arr = [0u8; 32];
     arr.copy_from_slice(&bytes);
-    VerifyingKey::from_bytes(&arr).map_err(|e| std::io::Error::new(
-        std::io::ErrorKind::InvalidData, format!("invalid verifying key: {}", e),
-    ))
+    VerifyingKey::from_bytes(&arr).map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("invalid verifying key: {}", e),
+        )
+    })
 }
 
 pub fn fingerprint(vk: &VerifyingKey) -> String {
@@ -68,18 +78,26 @@ pub fn fingerprint(vk: &VerifyingKey) -> String {
     h.update(vk.to_bytes());
     let d = h.finalize();
     let mut s = String::with_capacity(16);
-    for b in d.iter().take(8) { use std::fmt::Write; let _ = write!(&mut s, "{:02x}", b); }
+    for b in d.iter().take(8) {
+        use std::fmt::Write;
+        let _ = write!(&mut s, "{:02x}", b);
+    }
     s
 }
 
 fn hex(b: &[u8]) -> String {
     let mut s = String::with_capacity(b.len() * 2);
-    for x in b { use std::fmt::Write; let _ = write!(&mut s, "{:02x}", x); }
+    for x in b {
+        use std::fmt::Write;
+        let _ = write!(&mut s, "{:02x}", x);
+    }
     s
 }
 
 fn unhex(s: &str) -> Option<Vec<u8>> {
-    if s.len() % 2 != 0 { return None; }
+    if !s.len().is_multiple_of(2) {
+        return None;
+    }
     let mut out = Vec::with_capacity(s.len() / 2);
     let bytes = s.as_bytes();
     for i in (0..s.len()).step_by(2) {
@@ -132,7 +150,9 @@ mod tests {
         let base = std::env::temp_dir();
         let pid = std::process::id();
         let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos();
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .subsec_nanos();
         let dir = base.join(format!("apsl-cert-test-{}-{}", pid, nanos));
         std::fs::create_dir_all(&dir).unwrap();
         dir

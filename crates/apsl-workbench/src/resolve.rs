@@ -1,4 +1,3 @@
-
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -35,7 +34,6 @@ pub trait MaivecIndex {
     fn put(&self, embedding: Embedding, contract: Contract, store_path: &str, verdict: &Verdict);
 }
 
-
 pub fn embed_contract(contract: &Contract) -> Embedding {
     let mut v = vec![0.0f32; EMBED_DIM];
     let mut h: u64 = 0xcbf29ce484222325;
@@ -53,7 +51,6 @@ pub fn embed_contract(contract: &Contract) -> Embedding {
     }
     v
 }
-
 
 pub fn covers(candidate: &Contract, requested: &Contract) -> bool {
     if candidate.pre.len() != requested.pre.len() {
@@ -82,13 +79,11 @@ pub fn cover_filter(candidates: Vec<Candidate>, requested: &Contract) -> Vec<Can
         .collect()
 }
 
-
 pub type ImplFn<'a> = dyn Fn(&[f64]) -> Vec<f64> + 'a;
 
 pub fn verify_candidate(impl_fn: &ImplFn<'_>, requested: &Contract) -> Verdict {
     verify_numeric_node(&impl_fn, &requested.pre, &requested.post)
 }
-
 
 pub fn resolve_impl<'a>(
     index: &dyn MaivecIndex,
@@ -123,7 +118,6 @@ pub fn resolve_impl<'a>(
         verdict_satisfies: verdict.satisfies,
     }
 }
-
 
 struct Entry {
     embedding: Embedding,
@@ -174,7 +168,11 @@ impl MaivecIndex for InMemoryIndex {
                 score: cosine(query, &e.embedding),
             })
             .collect();
-        scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         scored.truncate(k);
         scored
     }
@@ -196,19 +194,32 @@ mod tests {
     use super::*;
 
     fn contract(canon: &str, pre: BoxSpec, post: BoxSpec) -> Contract {
-        Contract { canonical: canon.into(), pre, post }
+        Contract {
+            canonical: canon.into(),
+            pre,
+            post,
+        }
     }
 
     #[test]
     fn hit_reuses_verified_candidate() {
         let index = InMemoryIndex::new();
-        let stored = contract("double : (x:[0,1]) -> [0,2]", vec![(0.0, 1.0)], vec![(0.0, 2.0)]);
+        assert!(index.is_empty());
+        let stored = contract(
+            "double : (x:[0,1]) -> [0,2]",
+            vec![(0.0, 1.0)],
+            vec![(0.0, 2.0)],
+        );
         index.seed(stored, "/nix/store/aaa-double");
 
         let requested = stored_like();
-        let eval = |_c: &Candidate| -> Box<ImplFn<'static>> { Box::new(|x: &[f64]| vec![2.0 * x[0]]) };
+        let eval =
+            |_c: &Candidate| -> Box<ImplFn<'static>> { Box::new(|x: &[f64]| vec![2.0 * x[0]]) };
         let synth = |_c: &Contract| -> (String, Box<ImplFn<'static>>) {
-            (String::from("/nix/store/synth"), Box::new(|x: &[f64]| x.to_vec()))
+            (
+                String::from("/nix/store/synth"),
+                Box::new(|x: &[f64]| x.to_vec()),
+            )
         };
 
         let before = index.len();
@@ -220,7 +231,11 @@ mod tests {
     }
 
     fn stored_like() -> Contract {
-        contract("double : (x:[0,1]) -> [0,2]", vec![(0.0, 1.0)], vec![(0.0, 2.0)])
+        contract(
+            "double : (x:[0,1]) -> [0,2]",
+            vec![(0.0, 1.0)],
+            vec![(0.0, 2.0)],
+        )
     }
 
     #[test]
@@ -233,11 +248,13 @@ mod tests {
             vec![(0.0, 1.0), (0.0, 1.0)],
             vec![(0.0, 2.0)],
         );
-        let eval = |_c: &Candidate| -> Box<ImplFn<'static>> {
-            Box::new(|x: &[f64]| vec![2.0 * x[0]])
-        };
+        let eval =
+            |_c: &Candidate| -> Box<ImplFn<'static>> { Box::new(|x: &[f64]| vec![2.0 * x[0]]) };
         let synth = |_c: &Contract| -> (String, Box<ImplFn<'static>>) {
-            (String::from("/nix/store/bbb-add"), Box::new(|x: &[f64]| vec![x[0] + x[1]]))
+            (
+                String::from("/nix/store/bbb-add"),
+                Box::new(|x: &[f64]| vec![x[0] + x[1]]),
+            )
         };
 
         let r = resolve_impl(&index, &requested, 5, &eval, &synth);
@@ -253,9 +270,13 @@ mod tests {
         let requested = stored_like();
         index.seed(stored_like(), "/nix/store/ccc-bad");
 
-        let eval = |_c: &Candidate| -> Box<ImplFn<'static>> { Box::new(|x: &[f64]| vec![10.0 * x[0]]) };
+        let eval =
+            |_c: &Candidate| -> Box<ImplFn<'static>> { Box::new(|x: &[f64]| vec![10.0 * x[0]]) };
         let synth = |_c: &Contract| -> (String, Box<ImplFn<'static>>) {
-            (String::from("/nix/store/ddd-good"), Box::new(|x: &[f64]| vec![2.0 * x[0]]))
+            (
+                String::from("/nix/store/ddd-good"),
+                Box::new(|x: &[f64]| vec![2.0 * x[0]]),
+            )
         };
 
         let r = resolve_impl(&index, &requested, 5, &eval, &synth);

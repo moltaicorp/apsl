@@ -1,4 +1,3 @@
-
 use crate::{verify, Impl, Params, Verdict};
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -12,7 +11,10 @@ pub struct ProcessImpl {
 
 impl ProcessImpl {
     pub fn new(program: impl Into<String>) -> Self {
-        Self { program: program.into(), args: Vec::new() }
+        Self {
+            program: program.into(),
+            args: Vec::new(),
+        }
     }
     pub fn arg(mut self, a: impl Into<String>) -> Self {
         self.args.push(a.into());
@@ -41,7 +43,10 @@ impl Impl for ProcessImpl {
         let out = child.wait_with_output().expect("child wait");
         let text = String::from_utf8_lossy(&out.stdout);
         text.split_whitespace()
-            .map(|t| t.parse::<f64>().unwrap_or_else(|e| panic!("parse node output {t:?}: {e}")))
+            .map(|t| {
+                t.parse::<f64>()
+                    .unwrap_or_else(|e| panic!("parse node output {t:?}: {e}"))
+            })
             .collect()
     }
 }
@@ -71,6 +76,9 @@ pub fn verify_numeric_node_p(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static SCRIPT_ID: AtomicU64 = AtomicU64::new(0);
 
     struct Script(std::path::PathBuf);
     impl Drop for Script {
@@ -80,7 +88,7 @@ mod tests {
     }
     fn script(body: &str) -> (Script, ProcessImpl) {
         use std::os::unix::fs::PermissionsExt;
-        let uniq = body.bytes().fold(0u64, |a, b| a.wrapping_mul(31).wrapping_add(b as u64));
+        let uniq = SCRIPT_ID.fetch_add(1, Ordering::Relaxed);
         let mut path = std::env::temp_dir();
         path.push(format!("apsl-node-{}-{}.sh", std::process::id(), uniq));
         std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
@@ -93,7 +101,10 @@ mod tests {
     fn external_binary_satisfies() {
         let (_g, pi) = script("read x; awk -v x=$x 'BEGIN{print 2*x}'");
         let v = verify_numeric_node(&pi, &vec![(0.0, 1.0)], &vec![(0.0, 2.0)]);
-        assert!(v.satisfies && v.witness.is_none() && !v.refactor_suggested, "{v:?}");
+        assert!(
+            v.satisfies && v.witness.is_none() && !v.refactor_suggested,
+            "{v:?}"
+        );
     }
 
     #[test]
@@ -106,14 +117,16 @@ mod tests {
 
     #[test]
     fn external_binary_fold_suggests_refactor() {
-        let (_g, pi) = script(
-            "read x; awk -v x=$x 'BEGIN{d=x-0.5; if(d<0)d=-d; print 1/(d+0.001)}'",
-        );
+        let (_g, pi) =
+            script("read x; awk -v x=$x 'BEGIN{d=x-0.5; if(d<0)d=-d; print 1/(d+0.001)}'");
         let v = verify_numeric_node_p(
             &pi,
             &vec![(0.0, 1.0)],
             &vec![(0.0, 1.0e9)],
-            Params { grid: 11, ..Params::default() },
+            Params {
+                grid: 11,
+                ..Params::default()
+            },
         );
         assert!(!v.folds.is_empty(), "expected fold near 0.5: {v:?}");
         assert!(v.refactor_suggested, "{v:?}");
@@ -122,7 +135,11 @@ mod tests {
     #[test]
     fn in_process_path_still_works() {
         let f = |v: &[f64]| vec![v[0] + v[1], v[0] - v[1]];
-        let v = verify_numeric_node(&f, &vec![(0.0, 1.0), (0.0, 1.0)], &vec![(-2.0, 2.0), (-2.0, 2.0)]);
+        let v = verify_numeric_node(
+            &f,
+            &vec![(0.0, 1.0), (0.0, 1.0)],
+            &vec![(-2.0, 2.0), (-2.0, 2.0)],
+        );
         assert!(v.satisfies && !v.refactor_suggested, "{v:?}");
     }
 

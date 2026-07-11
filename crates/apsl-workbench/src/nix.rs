@@ -1,4 +1,3 @@
-
 use std::collections::HashSet;
 use std::process::Command;
 
@@ -27,11 +26,7 @@ pub fn request_id(src: &str) -> String {
 pub fn gen_flake(nodes: &[String]) -> String {
     let mk: String = nodes
         .iter()
-        .map(|n| {
-            format!(
-                "        \"{n}\" = mkNode \"{n}\" \"#!/bin/sh\\necho apsl-node-{n}\\n\";"
-            )
-        })
+        .map(|n| format!("        \"{n}\" = mkNode \"{n}\" \"#!/bin/sh\\necho apsl-node-{n}\\n\";"))
         .collect::<Vec<_>>()
         .join("\n");
     let manifest_entries: String = nodes
@@ -88,11 +83,10 @@ pub fn build(src: &str, nodes: &[String]) -> Result<BuildResult, String> {
         return Err(format!("nix build failed: {}", &err[..err.len().min(600)]));
     }
 
-    let manifest_raw = sh(&format!("cat {app}/manifest.json"))
-        .map_err(|e| format!("cat manifest: {e}"))?;
+    let manifest_raw =
+        sh(&format!("cat {app}/manifest.json")).map_err(|e| format!("cat manifest: {e}"))?;
     let manifest: std::collections::HashMap<String, String> =
-        serde_json::from_slice(&manifest_raw.stdout)
-            .map_err(|e| format!("parse manifest: {e}"))?;
+        serde_json::from_slice(&manifest_raw.stdout).map_err(|e| format!("parse manifest: {e}"))?;
 
     let closure_raw = sh(&format!("nix-store -q --requisites {app}"))
         .map_err(|e| format!("nix-store -q: {e}"))?;

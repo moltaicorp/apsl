@@ -1,4 +1,3 @@
-
 use std::collections::{BTreeSet, VecDeque};
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -48,7 +47,10 @@ pub enum LinkError {
 impl fmt::Display for LinkError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LinkError::NotFound { symbol, search_path } => {
+            LinkError::NotFound {
+                symbol,
+                search_path,
+            } => {
                 write!(f, "apsl-link: symbol `{}` not found\n  searched:", symbol)?;
                 for p in search_path {
                     write!(f, "\n    {}", p.display())?;
@@ -56,18 +58,39 @@ impl fmt::Display for LinkError {
                 Ok(())
             }
             LinkError::Collision { symbol, locations } => {
-                write!(f, "apsl-link: symbol `{}` defined in multiple files:", symbol)?;
+                write!(
+                    f,
+                    "apsl-link: symbol `{}` defined in multiple files:",
+                    symbol
+                )?;
                 for (path, line) in locations {
                     write!(f, "\n  --> {}:{}", path.display(), line)?;
                 }
                 write!(f, "\nhint: remove one definition or narrow your search path with APSL_PATH or .apsl-path")
             }
-            LinkError::ParseError { symbol, file, line, msg } => {
-                write!(f, "apsl-link: failed to parse definition of `{}` from {}:{}\n  {}", symbol, file.display(), line, msg)
+            LinkError::ParseError {
+                symbol,
+                file,
+                line,
+                msg,
+            } => {
+                write!(
+                    f,
+                    "apsl-link: failed to parse definition of `{}` from {}:{}\n  {}",
+                    symbol,
+                    file.display(),
+                    line,
+                    msg
+                )
             }
             LinkError::DepthExceeded { depth, pending } => {
-                write!(f, "apsl-link: resolution depth {} exceeded with {} symbols still pending: {}",
-                    depth, pending.len(), pending.join(", "))
+                write!(
+                    f,
+                    "apsl-link: resolution depth {} exceeded with {} symbols still pending: {}",
+                    depth,
+                    pending.len(),
+                    pending.join(", ")
+                )
             }
         }
     }
@@ -161,10 +184,8 @@ fn check_collision(symbol: &str, hits: &[Located]) -> Result<Located, LinkError>
     let canonical = hits[0].block.trim();
     for hit in &hits[1..] {
         if hit.block.trim() != canonical {
-            let locations: Vec<(PathBuf, u32)> = hits
-                .iter()
-                .map(|h| (h.file.clone(), h.line))
-                .collect();
+            let locations: Vec<(PathBuf, u32)> =
+                hits.iter().map(|h| (h.file.clone(), h.line)).collect();
             return Err(LinkError::Collision {
                 symbol: symbol.to_string(),
                 locations,
@@ -207,7 +228,7 @@ fn decl_name(d: &Decl) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use apsl_core::ast::*;
+
     use std::io::Write;
 
     fn write_temp_apsl(dir: &Path, name: &str, content: &str) -> PathBuf {
@@ -228,7 +249,7 @@ mod tests {
         write_temp_apsl(&dir, "types.apsl", "type Email = String\n");
 
         let prog = apsl_parse::parse_str(source_content).unwrap();
-        let result = link(&prog, &source_path, &[dir.clone()]).unwrap();
+        let result = link(&prog, &source_path, std::slice::from_ref(&dir)).unwrap();
 
         assert_eq!(result.resolved.len(), 1);
         assert_eq!(result.resolved[0].symbol, "Email");
@@ -249,7 +270,7 @@ mod tests {
         write_temp_apsl(&dir, "b.apsl", "type Email = Int\n");
 
         let prog = apsl_parse::parse_str(source_content).unwrap();
-        let result = link(&prog, &source_path, &[dir.clone()]);
+        let result = link(&prog, &source_path, std::slice::from_ref(&dir));
 
         assert!(matches!(result, Err(LinkError::Collision { .. })));
 
@@ -268,7 +289,7 @@ mod tests {
         write_temp_apsl(&dir, "b.apsl", "type Email = String\n");
 
         let prog = apsl_parse::parse_str(source_content).unwrap();
-        let result = link(&prog, &source_path, &[dir.clone()]).unwrap();
+        let result = link(&prog, &source_path, std::slice::from_ref(&dir)).unwrap();
 
         assert_eq!(result.resolved.len(), 1);
 

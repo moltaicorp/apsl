@@ -1,12 +1,13 @@
-
 pub mod node;
-pub use node::{verify_numeric_node, ProcessImpl, BoxSpec};
+pub use node::{verify_numeric_node, BoxSpec, ProcessImpl};
 
 pub trait Impl {
     fn eval(&self, x: &[f64]) -> Vec<f64>;
 }
 impl<F: Fn(&[f64]) -> Vec<f64>> Impl for F {
-    fn eval(&self, x: &[f64]) -> Vec<f64> { self(x) }
+    fn eval(&self, x: &[f64]) -> Vec<f64> {
+        self(x)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -26,7 +27,14 @@ pub struct Params {
     pub eps: f64,
 }
 impl Default for Params {
-    fn default() -> Self { Self { grid: 7, fold_ratio: 8.0, refine_depth: 2, eps: 1e-5 } }
+    fn default() -> Self {
+        Self {
+            grid: 7,
+            fold_ratio: 8.0,
+            refine_depth: 2,
+            eps: 1e-5,
+        }
+    }
 }
 
 fn jacobian(f: &dyn Impl, x: &[f64], eps: f64) -> (Vec<f64>, usize, usize) {
@@ -47,12 +55,16 @@ fn jacobian(f: &dyn Impl, x: &[f64], eps: f64) -> (Vec<f64>, usize, usize) {
 }
 
 fn max_singular_value(j: &[f64], m: usize, n: usize) -> f64 {
-    if m == 0 || n == 0 { return 0.0; }
+    if m == 0 || n == 0 {
+        return 0.0;
+    }
     let mut a = vec![0.0; n * n];
     for i in 0..n {
         for k in 0..n {
             let mut s = 0.0;
-            for r in 0..m { s += j[r * n + i] * j[r * n + k]; }
+            for r in 0..m {
+                s += j[r * n + i] * j[r * n + k];
+            }
             a[i * n + k] = s;
         }
     }
@@ -62,12 +74,18 @@ fn max_singular_value(j: &[f64], m: usize, n: usize) -> f64 {
         let mut av = vec![0.0; n];
         for i in 0..n {
             let mut s = 0.0;
-            for k in 0..n { s += a[i * n + k] * v[k]; }
+            for k in 0..n {
+                s += a[i * n + k] * v[k];
+            }
             av[i] = s;
         }
         let norm = av.iter().map(|x| x * x).sum::<f64>().sqrt();
-        if norm < 1e-300 { return 0.0; }
-        for i in 0..n { v[i] = av[i] / norm; }
+        if norm < 1e-300 {
+            return 0.0;
+        }
+        for i in 0..n {
+            v[i] = av[i] / norm;
+        }
         lambda = norm;
     }
     lambda.max(0.0).sqrt()
@@ -80,9 +98,14 @@ pub fn verify(
     p: Params,
 ) -> Verdict {
     let n = pre.len();
-    let axes: Vec<Vec<f64>> = pre.iter().map(|&(lo, hi)| {
-        (0..p.grid).map(|i| lo + (hi - lo) * i as f64 / (p.grid - 1).max(1) as f64).collect()
-    }).collect();
+    let axes: Vec<Vec<f64>> = pre
+        .iter()
+        .map(|&(lo, hi)| {
+            (0..p.grid)
+                .map(|i| lo + (hi - lo) * i as f64 / (p.grid - 1).max(1) as f64)
+                .collect()
+        })
+        .collect();
     let base = cartesian(&axes);
 
     let mut witness: Option<Vec<f64>> = None;
@@ -92,7 +115,9 @@ pub fn verify(
     let check = |x: &[f64], witness: &mut Option<Vec<f64>>, samples: &mut usize| -> f64 {
         *samples += 1;
         let y = f.eval(x);
-        if witness.is_none() && !post(&y) { *witness = Some(x.to_vec()); }
+        if witness.is_none() && !post(&y) {
+            *witness = Some(x.to_vec());
+        }
         let (j, m, nn) = jacobian(f, x, p.eps);
         max_singular_value(&j, m, nn)
     };
@@ -102,7 +127,11 @@ pub fn verify(
     }
     let mut sorted = sigmas.clone();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    let med = if sorted.is_empty() { 0.0 } else { sorted[sorted.len() / 2] };
+    let med = if sorted.is_empty() {
+        0.0
+    } else {
+        sorted[sorted.len() / 2]
+    };
     let thresh = (med * p.fold_ratio).max(1e-9);
 
     let mut folds = Vec::new();
@@ -110,17 +139,29 @@ pub fn verify(
     for (x, &s) in base.iter().zip(&sigmas) {
         if s > thresh {
             folds.push(x.clone());
-            let step: Vec<f64> = pre.iter().map(|&(lo, hi)|
-                (hi - lo) / (p.grid - 1).max(1) as f64 / (p.refine_depth + 1) as f64).collect();
+            let step: Vec<f64> = pre
+                .iter()
+                .map(|&(lo, hi)| {
+                    (hi - lo) / (p.grid - 1).max(1) as f64 / (p.refine_depth + 1) as f64
+                })
+                .collect();
             let mut still = false;
             for k in 1..=p.refine_depth {
                 for sign in [-1.0, 1.0] {
-                    let xr: Vec<f64> = x.iter().zip(pre).enumerate().map(|(i, (xi, &(lo, hi)))|
-                        (xi + sign * k as f64 * step[i]).clamp(lo, hi)).collect();
-                    if check(&xr, &mut witness, &mut samples) > thresh { still = true; }
+                    let xr: Vec<f64> = x
+                        .iter()
+                        .zip(pre)
+                        .enumerate()
+                        .map(|(i, (xi, &(lo, hi)))| (xi + sign * k as f64 * step[i]).clamp(lo, hi))
+                        .collect();
+                    if check(&xr, &mut witness, &mut samples) > thresh {
+                        still = true;
+                    }
                 }
             }
-            if still { persistent += 1; }
+            if still {
+                persistent += 1;
+            }
         }
     }
     let _ = n;
@@ -155,15 +196,26 @@ mod tests {
 
     #[test]
     fn satisfies_smooth_monotone() {
-        let v = verify(&|x: &[f64]| vec![2.0 * x[0]], &[(0.0, 1.0)],
-                       &|y: &[f64]| (0.0..=2.0).contains(&y[0]), Params::default());
-        assert!(v.satisfies && v.witness.is_none() && !v.refactor_suggested, "{v:?}");
+        let v = verify(
+            &|x: &[f64]| vec![2.0 * x[0]],
+            &[(0.0, 1.0)],
+            &|y: &[f64]| (0.0..=2.0).contains(&y[0]),
+            Params::default(),
+        );
+        assert!(
+            v.satisfies && v.witness.is_none() && !v.refactor_suggested,
+            "{v:?}"
+        );
     }
 
     #[test]
     fn violates_with_witness() {
-        let v = verify(&|x: &[f64]| vec![2.0 * x[0]], &[(0.0, 1.0)],
-                       &|y: &[f64]| (0.0..=1.0).contains(&y[0]), Params::default());
+        let v = verify(
+            &|x: &[f64]| vec![2.0 * x[0]],
+            &[(0.0, 1.0)],
+            &|y: &[f64]| (0.0..=1.0).contains(&y[0]),
+            Params::default(),
+        );
         assert!(!v.satisfies, "{v:?}");
         assert!(v.witness.as_ref().unwrap()[0] > 0.5 - 1e-6, "{v:?}");
     }
@@ -171,8 +223,15 @@ mod tests {
     #[test]
     fn fold_suggests_refactor() {
         let spike = |x: &[f64]| vec![1.0 / ((x[0] - 0.5).abs() + 1e-3)];
-        let v = verify(&spike, &[(0.0, 1.0)], &|_y: &[f64]| true,
-                       Params { grid: 11, ..Params::default() });
+        let v = verify(
+            &spike,
+            &[(0.0, 1.0)],
+            &|_y: &[f64]| true,
+            Params {
+                grid: 11,
+                ..Params::default()
+            },
+        );
         assert!(!v.folds.is_empty(), "expected fold near 0.5: {v:?}");
         assert!(v.refactor_suggested, "{v:?}");
     }
@@ -180,9 +239,12 @@ mod tests {
     #[test]
     fn two_d_satisfies() {
         let f = |v: &[f64]| vec![v[0] + v[1], v[0] - v[1]];
-        let v = verify(&f, &[(0.0, 1.0), (0.0, 1.0)],
-                       &|y: &[f64]| (-2.0..=2.0).contains(&y[0]) && (-2.0..=2.0).contains(&y[1]),
-                       Params::default());
+        let v = verify(
+            &f,
+            &[(0.0, 1.0), (0.0, 1.0)],
+            &|y: &[f64]| (-2.0..=2.0).contains(&y[0]) && (-2.0..=2.0).contains(&y[1]),
+            Params::default(),
+        );
         assert!(v.satisfies && !v.refactor_suggested, "{v:?}");
     }
 }
