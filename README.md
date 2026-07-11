@@ -1,7 +1,7 @@
 # APSL — Abstract Protocol Schema Language
 
 <p align="center">
-  <img src="assets/apsl-the-file-is-the-machine.png" alt="APSL — the file is the machine" width="480">
+  <img src="assets/apsl-the-file-is-the-machine.png" alt="APSL — the file is the machine">
 </p>
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
@@ -21,6 +21,10 @@ This means N agents can implement N nodes in parallel with zero coordination ove
 APSL is a first-order, indentation-sensitive DSL with Hindley-Milner type inference. A `.apsl` file declares type aliases, nodes (pure functions with contracts), and graphs (flow compositions of nodes). The compiler pipeline: parse → link (symbol discovery, no imports) → typecheck (HM unification + flow composition) → complexity proof (derived from predicate structure) → SMT predicate discharge (Z3/CVC5) → Ed25519-signed certificate. Certificates are content-addressed (sha256), stored in a flat-file sharded store, and verifiable by anyone with the signer's public key. The membership predicate — every node's derived complexity must be ≤ O(n log n) per input size variable — is the complexity gate that keeps the language honest. Multi-variable terms like O(n·m) across distinct inputs are admitted; O(n²) over a single input is not.
 
 APSL supports parameterized types: `World<S>` where `S` is the RootState identity. `World<A>` does not unify with `World<B>` — different state identities cannot compose. The flow checker supports fan-in: `flow (a, b) -> c` feeds the tuple of a's and b's outputs into c. When nodes thread `World<S>`, tuple sources flatten the World automatically: `((World<S>, X), (World<S>, Y))` becomes `(World<S>, X, Y)`.
+
+<p align="center">
+  <img src="assets/apsl-ouroboros-transparent.png" alt="APSL ouroboros">
+</p>
 
 ## CLI Reference
 
