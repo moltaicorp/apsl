@@ -1,7 +1,7 @@
 # APSL — Abstract Protocol Schema Language
 
 <p align="center">
-  <img src="assets/apsl-banner.png" alt="APSL — the file is the machine" width="720">
+  <img src="assets/apsl-banner-transparent.png" alt="APSL — the file is the machine" width="720">
 </p>
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
