@@ -1,0 +1,16 @@
+type Message = String
+type Endpoint = String
+
+relay : Message -> Message
+  cx O(1) idem
+
+fixed_service : Message -> Message
+  state endpoint : Endpoint = "https://fixed.example"
+  cx O(1) idem
+
+positional_service : Message -> Message
+  state endpoint : Endpoint
+  cx O(1) idem
+
+graph pipeline : Message -> Message
+  flow in -> relay -> fixed_service -> positional_service -> out

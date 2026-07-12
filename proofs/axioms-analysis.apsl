@@ -1,0 +1,168 @@
+# ================================================================
+# Foundational Proof DAGs — Spectral Perturbation Theory & Graph Theory
+# ================================================================
+
+# --- Shared type aliases ---
+
+type Nat = Int
+type Real = Float
+type Bool = Int
+type Matrix = (String, Int)
+type AnalyticFamily = (String, Int, Int)
+type EigenvalueList = (String, Bool)
+type Eigenvector = (String, Nat)
+type EigenvectorList = (String, Nat, Int)
+type PowerSeries = (String, Float)
+type CharPoly = (String, Float, Int)
+type Graph = (String, Int, Bool)
+type FockState = (String, Float, Bool)
+type GPath = (String, Nat, Bool)
+type GammaPath = (String, Nat, Float)
+type CorrectionSum = (String, Bool, Int)
+type Eigenvalue = (Real, Int)
+type InnerProduct = (Real, Int, Int)
+type Norm = (Real, Bool)
+type FrobeniusNorm = (Real, Int, Bool)
+type Trace = (Real, Nat)
+type SymmetricMatrix = (Matrix, Int)
+type Perturbation = (Matrix, Int, Int)
+type Hamiltonian = (Matrix, Bool)
+
+# ================================================================
+# THEOREM 1: Rellich's Analytic Perturbation Theorem
+#
+# If A(t) is a real-analytic family of N×N symmetric matrices
+# with simple eigenvalues at t=0, then eigenvalues λ_k(t) and
+# eigenvectors ψ_k(t) can be chosen to depend analytically on t.
+# ================================================================
+
+rellich_analytic_entries : AnalyticFamily -> PowerSeries
+  cx O(1) idem
+
+rellich_char_poly : PowerSeries -> CharPoly
+  cx O(1) idem
+
+rellich_simple_eigenvalues_at_zero : CharPoly -> EigenvalueList
+  cx O(1) idem
+
+rellich_nonzero_deriv : EigenvalueList -> Bool
+  cx O(1) idem
+
+rellich_implicit_function : Bool -> EigenvalueList
+  cx O(1) idem
+
+rellich_adjugate_eigenvector : EigenvalueList -> EigenvectorList
+  cx O(1) idem
+
+rellich_normalize : EigenvectorList -> EigenvectorList
+  cx O(1) idem
+
+graph rellich_theorem : AnalyticFamily -> EigenvectorList
+  flow in -> rellich_analytic_entries -> rellich_char_poly -> rellich_simple_eigenvalues_at_zero -> rellich_nonzero_deriv -> rellich_implicit_function -> rellich_adjugate_eigenvector -> rellich_normalize -> out
+
+# ================================================================
+# THEOREM 2: Rayleigh-Schrödinger Perturbation Theory
+#
+# Given H(t) = H₀ + tV with simple eigenvalue λ_k⁰:
+#   First order:  λ_k'(0) = ⟨ψ_k⁰|V|ψ_k⁰⟩
+#   Second order: λ_k''(0) = 2 Σ_{j≠k} |V_kj|²/(λ_k⁰ - λ_j⁰)
+# ================================================================
+
+# -- First-order perturbation --
+
+rs_eigenvalue_equation : Hamiltonian -> Eigenvector
+  cx O(1) idem
+
+rs_differentiate_once : Eigenvector -> Perturbation
+  cx O(1) idem
+
+rs_evaluate_at_zero : Perturbation -> Perturbation
+  cx O(1) idem
+
+rs_inner_product_with_psi : Perturbation -> InnerProduct
+  cx O(1) idem
+
+rs_symmetry_cancel : InnerProduct -> InnerProduct
+  cx O(1) idem
+
+rs_first_order_correction : InnerProduct -> Eigenvalue
+  cx O(1) idem
+
+graph rs_first_order : Hamiltonian -> Eigenvalue
+  flow in -> rs_eigenvalue_equation -> rs_differentiate_once -> rs_evaluate_at_zero -> rs_inner_product_with_psi -> rs_symmetry_cancel -> rs_first_order_correction -> out
+
+# -- Second-order perturbation --
+
+rs_differentiate_twice : Hamiltonian -> Perturbation
+  cx O(1) idem
+
+rs_project_onto_psi : Perturbation -> InnerProduct
+  cx O(1) idem
+
+rs_first_order_eigenvector : InnerProduct -> CorrectionSum
+  cx O(1) idem
+
+rs_substitute_correction : CorrectionSum -> InnerProduct
+  cx O(1) idem
+
+rs_second_order_correction : InnerProduct -> Eigenvalue
+  cx O(1) idem
+
+graph rs_second_order : Hamiltonian -> Eigenvalue
+  flow in -> rs_differentiate_twice -> rs_project_onto_psi -> rs_first_order_eigenvector -> rs_substitute_correction -> rs_second_order_correction -> out
+
+# ================================================================
+# THEOREM 3: Isospectrality implies Equal Traces of Powers
+#
+# If symmetric A,B have the same eigenvalues (with multiplicity),
+# then tr(A^k) = tr(B^k) for all k.
+# ================================================================
+
+iso_eigenvalue_decomposition : SymmetricMatrix -> EigenvalueList
+  cx O(1) idem
+
+iso_trace_as_eigenvalue_sum : EigenvalueList -> Trace
+  cx O(1) idem
+
+iso_equal_spectra_equal_sums : Trace -> Bool
+  cx O(1) idem
+
+iso_frobenius_norm_case : Bool -> FrobeniusNorm
+  cx O(1) idem
+
+graph isospectrality_traces : SymmetricMatrix -> FrobeniusNorm
+  flow in -> iso_eigenvalue_decomposition -> iso_trace_as_eigenvalue_sum -> iso_equal_spectra_equal_sums -> iso_frobenius_norm_case -> out
+
+# ================================================================
+# THEOREM 4: Connected Graph implies Irreducible Support
+#
+# If G is connected, then its support graph Γ(A^(sym)) is connected.
+# Constructive proof via path concatenation in Fock space.
+# ================================================================
+
+conn_pick_fock_pair : Graph -> FockState
+  cx O(1) idem
+
+conn_path_first_particle : FockState -> GPath
+  cx O(1) idem
+
+conn_lift_first_to_gamma : GPath -> GammaPath
+  cx O(1) idem
+
+conn_reach_intermediate : GammaPath -> FockState
+  cx O(1) idem
+
+conn_path_second_particle : FockState -> GPath
+  cx O(1) idem
+
+conn_lift_second_to_gamma : GPath -> GammaPath
+  cx O(1) idem
+
+conn_concatenate_paths : GammaPath -> GammaPath
+  cx O(1) idem
+
+conn_arbitrary_pair_connected : GammaPath -> Bool
+  cx O(1) idem
+
+graph connected_irreducible : Graph -> Bool
+  flow in -> conn_pick_fock_pair -> conn_path_first_particle -> conn_lift_first_to_gamma -> conn_reach_intermediate -> conn_path_second_particle -> conn_lift_second_to_gamma -> conn_concatenate_paths -> conn_arbitrary_pair_connected -> out

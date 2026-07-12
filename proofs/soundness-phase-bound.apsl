@@ -1,0 +1,204 @@
+# soundness-phase-bound.apsl — Eschabot n^17 proof: Soundness, Phase Rigidity, Degree Bound
+#
+# Decomposes Theorems 4.1, 5.7, 5.8, 7.3, and Corollary 7.7 into atomic
+# APSL nodes with nominal types. Each logical inference step is one node.
+# Graphs compose the steps into the full theorem proofs.
+#
+# Design: each node's output tuple is exactly the next node's input tuple.
+# This gives clean linear flow chains with no fan-in needed.
+
+
+# ═══════════════════════════════════════════════════════════════════
+# NOMINAL TYPES
+# ═══════════════════════════════════════════════════════════════════
+
+# Core graph objects
+type Graph = (Int, Int)
+type VertexCount = (Int, Int, Int)
+type Permutation = (Int, Int, Int, Int)
+
+# Fock space objects
+type FockLift = (Int, Int, Int, Int, Int)
+type HamiltonianFamily = (Int, Int, Int, Int, Int, Int)
+
+# Algebraic objects
+type Matrix = (Int, Int, Int, Int, Int, Int, Int)
+type DiagonalSignMatrix = (Int, Int, Int, Int, Int, Int, Int, Int)
+type SymmetrizedMatrix = (Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type SupportGraph = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+# Spectral / polynomial objects
+type Discriminant = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type Degree = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type OrbitPairCount = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+# Proof witnesses — each theorem conclusion is a distinct type
+type UnitaryEquivalence = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type AmplitudePreservation = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type MultisetPreservation = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type SoundnessWitness = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type ConnectednessWitness = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type PhaseCollapseWitness = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type PhaseRigidityWitness = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type SpectralRigidityWitness = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type PencilCompletenessWitness = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type CofactorDegreeBound = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type CofactorDiffBound = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type ProductDegreeBound = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type ExpandedDegreeBound = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type DegreeBoundWitness = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type GridSizeBound = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type NonRootExistence = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# THEOREM 4.1 — SOUNDNESS
+# If G1 ≅ G2 via π, then the Fock lift π̂ conjugates H_j(G1)
+# to H_{π(j)}(G2). Three inference steps chained.
+# ═══════════════════════════════════════════════════════════════════
+
+# Step 1: Lift isomorphism π to Fock space as π̂.
+# Show π̂ · exp(-iH_j(G1)t) · π̂† = exp(-iH_{π(j)}(G2)t).
+# Carries forward: the equivalence witness + context for amplitude step.
+soundness_unitary_equiv : (Graph, Graph, Permutation, FockLift, HamiltonianFamily) -> (UnitaryEquivalence, FockLift, VertexCount)
+  post  true
+  cx    O(1) idem
+
+# Step 2: Transition amplitudes preserved.
+# ⟨β| exp(-iHt) |α⟩ invariant because π̂ bijects Fock states.
+# Carries forward: amplitude witness + vertex count for multiset step.
+soundness_amplitude_preservation : (ue: UnitaryEquivalence, lift: FockLift, n: VertexCount) -> (AmplitudePreservation, VertexCount)
+  pre   ue.0 > 0, lift.0 > 0
+  post  true
+  cx    O(1) idem
+
+# Step 3: Multiset structure preserved.
+# Occupation-number multiset invariant under π relabeling of [n].
+soundness_multiset_preservation : (ap: AmplitudePreservation, n: VertexCount) -> SoundnessWitness
+  pre   ap.0 > 0, n.0 > 0
+  post  out.0 > 0
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════════════
+# THEOREM 5.7 — PHASE RIGIDITY
+# If diagonal sign matrix Q satisfies QAQ = A, then Q = ±I.
+# ═══════════════════════════════════════════════════════════════════
+
+# Step 1: Build support graph Γ of symmetrized adjacency A^(sym).
+# Γ has edges (α,β) wherever A^(sym)_{αβ} ≠ 0.
+# Carries forward: Γ + base graph G + vertex count + sign matrix Q + A.
+phase_support_graph : (SymmetrizedMatrix, Graph, VertexCount, DiagonalSignMatrix) -> (SupportGraph, Graph, VertexCount, DiagonalSignMatrix, SymmetrizedMatrix)
+  post  true
+  cx    O(n * n) idem
+
+# Step 2: Prove Γ connected when G connected.
+# Moving one boson at a time along G-edges connects any two Fock states.
+# Carries forward: connectedness witness + sign matrix + A.
+phase_connectedness : (SupportGraph, Graph, VertexCount, DiagonalSignMatrix, SymmetrizedMatrix) -> (ConnectednessWitness, DiagonalSignMatrix, SymmetrizedMatrix)
+  post  true
+  cx    O(1) idem
+
+# Step 3: Collapse Q to ±I.
+# QAQ = A forces q_α · q_β = 1 on every Γ-edge; Γ connected ⟹ Q = ±I.
+phase_collapse : (conn: ConnectednessWitness, q: DiagonalSignMatrix, a: SymmetrizedMatrix) -> PhaseRigidityWitness
+  pre   conn.0 > 0, q.0 > 0, a.0 > 0
+  post  out.0 > 0
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════════════
+# THEOREM 5.8 — PENCIL COMPLETENESS
+# Combines Spectral Rigidity (5.6) + Phase Rigidity (5.7).
+# ═══════════════════════════════════════════════════════════════════
+
+# Step 1: From Theorem 5.6 — spectral rigidity gives A2 = Q·A1·Q.
+# Carries forward: the spectral witness + phase rigidity + graph.
+spectral_rigidity_input : (Matrix, Matrix, PhaseRigidityWitness, Graph) -> (SpectralRigidityWitness, PhaseRigidityWitness, Graph)
+  post  true
+  cx    O(1) idem
+
+# Step 2: Apply phase rigidity — G connected ⟹ Q = ±I ⟹ A2 = A1.
+pencil_completeness : (sr: SpectralRigidityWitness, pr: PhaseRigidityWitness, g: Graph) -> PencilCompletenessWitness
+  pre   sr.0 > 0, pr.0 > 0, g.0 > 0
+  post  out.0 > 0
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════════════
+# THEOREM 7.3 — DEGREE BOUND
+# Fock-level discriminant Ω_j has degree ≤ n · C(N,2) = O(n^5).
+# ═══════════════════════════════════════════════════════════════════
+
+# Step 1: Cofactor degree via Leibniz formula.
+# At most n coincidence diagonals carry (V,ε)-dependence ⟹ deg ≤ n.
+# Carries forward: cofactor bound + orbit pair count + vertex count.
+degree_cofactor_bound : (HamiltonianFamily, VertexCount, OrbitPairCount) -> (CofactorDegreeBound, OrbitPairCount, VertexCount)
+  post  true
+  cx    O(1) idem
+
+# Step 2: Cofactor difference inherits same degree bound.
+# Carries forward: difference bound + orbit pairs + vertex count.
+degree_cofactor_diff : (cb: CofactorDegreeBound, pairs: OrbitPairCount, n: VertexCount) -> (CofactorDiffBound, OrbitPairCount, VertexCount)
+  pre   cb.0 > 0
+  post  true
+  cx    O(1) idem
+
+# Step 3: Product over ≤ C(N,2) orbit pairs ⟹ deg n · C(N,2).
+# Carries forward: product bound + vertex count.
+degree_orbit_product : (db: CofactorDiffBound, pairs: OrbitPairCount, n: VertexCount) -> (ProductDegreeBound, VertexCount)
+  pre   db.0 > 0, pairs.0 > 0
+  post  true
+  cx    O(1) idem
+
+# Step 4: Expand C(N,2) for 2-boson Fock space ⟹ n^5/8 + O(n^4).
+degree_expand : (pb: ProductDegreeBound, n: VertexCount) -> DegreeBoundWitness
+  pre   pb.0 > 0, n.0 > 0
+  post  out.0 > 0
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════════════
+# COROLLARY 7.7 — DETERMINISTIC PARAMETER SELECTION
+# S = {1,...,d+1}, d = ⌈n^5/8⌉. Grid |S|^2 = O(n^10).
+# Schwartz-Zippel: at least one grid point is a non-root of Ω_j.
+# ═══════════════════════════════════════════════════════════════════
+
+# Step 1: Derive grid size from degree bound.
+# d = ⌈n^5/8⌉, |S| = d+1, grid = |S|^2 = O(n^10).
+# Carries forward: grid size + discriminant + degree.
+param_grid_size : (DegreeBoundWitness, VertexCount, Discriminant, Degree) -> (GridSizeBound, Discriminant, Degree)
+  post  true
+  cx    O(1) idem
+
+# Step 2: Schwartz-Zippel guarantees a non-root exists.
+# deg(Ω_j) ≤ d < |S| ⟹ Ω_j cannot vanish on all of S^2.
+param_nonroot_existence : (gs: GridSizeBound, omega: Discriminant, deg: Degree) -> NonRootExistence
+  pre   gs.0 > 0, omega.0 > 0, deg.0 > 0
+  post  out.0 > 0
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════════════
+# COMPOSITION GRAPHS
+# ═══════════════════════════════════════════════════════════════════
+
+# Theorem 4.1: Soundness — three-step linear chain.
+graph thm_4_1_soundness : (Graph, Graph, Permutation, FockLift, HamiltonianFamily) -> SoundnessWitness
+  flow  in -> soundness_unitary_equiv -> soundness_amplitude_preservation -> soundness_multiset_preservation -> out
+
+# Theorem 5.7: Phase Rigidity — three-step linear chain.
+graph thm_5_7_phase_rigidity : (SymmetrizedMatrix, Graph, VertexCount, DiagonalSignMatrix) -> PhaseRigidityWitness
+  flow  in -> phase_support_graph -> phase_connectedness -> phase_collapse -> out
+
+# Theorem 5.8: Pencil Completeness — two-step chain.
+graph thm_5_8_pencil_completeness : (Matrix, Matrix, PhaseRigidityWitness, Graph) -> PencilCompletenessWitness
+  flow  in -> spectral_rigidity_input -> pencil_completeness -> out
+
+# Theorem 7.3: Degree Bound — four-step chain.
+graph thm_7_3_degree_bound : (HamiltonianFamily, VertexCount, OrbitPairCount) -> DegreeBoundWitness
+  flow  in -> degree_cofactor_bound -> degree_cofactor_diff -> degree_orbit_product -> degree_expand -> out
+
+# Corollary 7.7: Deterministic parameter selection — two-step chain.
+graph cor_7_7_param_selection : (DegreeBoundWitness, VertexCount, Discriminant, Degree) -> NonRootExistence
+  flow  in -> param_grid_size -> param_nonroot_existence -> out

@@ -1,0 +1,25 @@
+# Pure-functional dataflow over a "world" type.
+#
+# Side effects don't exist in APSL — they're encoded as `(World<S>, X) -> (World<S>, Y)`.
+# Cryptographic operations are pure: `(Key, Msg) -> Signature`.
+# Network calls thread the world: `(World<S>, Url) -> (World<S>, Response)`.
+#
+# World<S> is a parameterized type where S is the RootState identity.
+# World<WorldThread> is the RootState for this spec.
+# A spec using World<Other> would NOT type-unify with this one.
+
+type Bearer = String
+type Token = String
+type Url = String
+type Response = String
+type WorldThread = Int
+
+mint_token : World<WorldThread> -> World<WorldThread>
+  cx    O(1) idem
+
+http_post : World<WorldThread> -> World<WorldThread>
+  cx    O(1) idem-complex
+  sla   d <= 1/1000, T <= 200ms
+
+graph auth_flow : World<WorldThread> -> World<WorldThread>
+  flow  in -> mint_token -> http_post -> out

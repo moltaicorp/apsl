@@ -1,0 +1,10 @@
+[package]
+name = "apsl-types"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+apsl-core.workspace = true
+
+[dev-dependencies]
+apsl-parse.workspace = true

@@ -1,0 +1,8 @@
+[package]
+name = "apsl-complex"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+apsl-core.workspace = true
+apsl-types.workspace = true

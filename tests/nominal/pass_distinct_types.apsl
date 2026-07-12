@@ -1,0 +1,17 @@
+type ReadCap = String
+type WriteCap = String
+
+# Node that takes ReadCap and returns ReadCap
+read_resource : ReadCap -> ReadCap
+  cx O(1) idem
+
+# Node that takes WriteCap and returns WriteCap
+write_resource : WriteCap -> WriteCap
+  cx O(1) idem
+
+# Graph that uses each type consistently
+graph read_pipeline : ReadCap -> ReadCap
+  flow in -> read_resource -> out
+
+graph write_pipeline : WriteCap -> WriteCap
+  flow in -> write_resource -> out

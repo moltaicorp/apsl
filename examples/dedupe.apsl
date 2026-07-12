@@ -1,0 +1,31 @@
+# examples/dedupe.apsl
+#
+# A minimal end-to-end APSL example: type alias + four nodes + pipeline graph.
+# Every node carries a typed signature, contract predicates, and a complexity
+# claim. The graph composes them under flow.
+
+type Email = String
+type MessageId = String
+
+normalize : String[] -> Email[]
+  post  every out valid_email?
+  cx    O(n) idem
+  sla   e <= 0, d <= 0, T <= 5ms
+
+dedupe : Email[] -> Email[]
+  pre   every in valid_email?
+  post  unique? out, subseteq? out in
+  cx    O(n log n) idem
+  sla   e <= 0, d <= 1e-9, T <= 50ms
+
+classify : Email[] -> Email[]
+  cx    O(n) idem-complex
+  sla   e <= 0, d <= 0.02, T <= 800ms
+  via   @statistical holdout=intents_v3
+
+send : Email[] -> MessageId[]
+  cx    O(n) idem-complex
+  sla   e <= 0, d <= 1e-6, T <= 200ms
+
+graph email_pipeline : String[] -> MessageId[]
+  flow  in -> normalize -> dedupe -> classify -> send -> out

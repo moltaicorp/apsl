@@ -1,0 +1,161 @@
+# Algebraic Proof DAGs
+# Four foundational theorems: Schwartz-Zippel, Jacobi's Formula,
+# Leibniz degree bound, Partial Fractions Uniqueness
+
+# ── Type Aliases ──
+
+type Poly = (String, Int)
+type MultiPoly = (String, Int, Int)
+type FiniteSet = (String, Bool)
+type Point = (String, Real)
+type Nat = (String, Int, Bool)
+type Degree = (String, Real, Int)
+type Matrix = (String, Int, Int, Int)
+type Det = (String, Real, Real)
+type Trace = (String, Int, Real)
+type Adjugate = (String, Bool, Int)
+type Cofactor = (String, Bool, Real)
+type Sum = (String, Int, Int, Bool)
+type Product = (String, Real, Int, Int)
+type RationalFunc = (String, Bool, Int, Int)
+type Residue = (String, Real, Bool)
+type Limit = (String, Int, Bool, Real)
+
+# ═══════════════════════════════════════════════════════════════
+# THEOREM 1: Schwartz-Zippel Lemma
+# If f ∈ R[x₁,...,x_m] nonzero, deg(f) = d, |S| > d,
+# then ∃ point in S^m where f ≠ 0.
+# Proof by induction on number of variables m.
+# ═══════════════════════════════════════════════════════════════
+
+# Decompose f = Σ_{i=0}^{d'} g_i(x₁,...,x_{m-1}) · x_m^i
+# Extract leading coefficient g_{d'} which is nonzero
+sz_decompose_leading_variable : MultiPoly -> MultiPoly
+  cx O(1) idem
+
+# By inductive hypothesis on (m-1) variables:
+# g_{d'} is nonzero poly in m-1 vars, |S| > deg(g_{d'})
+# → ∃ a ∈ S^{m-1} with g_{d'}(a) ≠ 0
+sz_apply_ih_to_leading_coeff : MultiPoly -> Point
+  cx O(1) idem
+
+# Evaluate f(a, x_m): substituting a into f gives univariate poly
+# in x_m of degree d' with nonzero leading coefficient g_{d'}(a)
+sz_specialize_to_univariate : Point -> Poly
+  cx O(1) idem
+
+# Base case: univariate polynomial of degree d' ≤ d has at most d' roots
+# Since |S| > d ≥ d', there exists b ∈ S with f(a,b) ≠ 0
+sz_apply_base_case : Poly -> Point
+  cx O(1) idem
+
+# Combine witnesses: (a, b) ∈ S^m and f(a, b) ≠ 0
+sz_combine_witness : Point -> Point
+  cx O(1) idem
+
+graph schwartz_zippel : MultiPoly -> Point
+  flow in -> sz_decompose_leading_variable -> sz_apply_ih_to_leading_coeff -> sz_specialize_to_univariate -> sz_apply_base_case -> sz_combine_witness -> out
+
+# ═══════════════════════════════════════════════════════════════
+# THEOREM 2: Jacobi's Formula
+# d/dz det(zI - A) = tr(adj(zI - A))
+# ═══════════════════════════════════════════════════════════════
+
+# Expand det(zI - A) via Leibniz formula
+# det(zI-A) = Σ_σ sgn(σ) Π_i (zI-A)_{i,σ(i)}
+jf_leibniz_expand : Matrix -> Sum
+  cx O(1) idem
+
+# Differentiate: d/dz of each product term by product rule
+# picks exactly one factor to differentiate, rest unchanged
+jf_differentiate_product : Sum -> Sum
+  cx O(1) idem
+
+# d/dz (zI-A)_{i,j} = δ_{ij}, so only diagonal factors contribute
+# nonzero derivative. Terms with σ(k)≠k vanish.
+jf_filter_diagonal_contributions : Sum -> Sum
+  cx O(1) idem
+
+# For each diagonal position k: sum over σ fixing k gives
+# the (N-1)×(N-1) minor with row k, col k deleted
+jf_collect_minor_per_position : Sum -> Det
+  cx O(1) idem
+
+# The (k,k) minor determinant equals the (k,k) cofactor
+# which is adj(zI-A)_{kk} by definition of the adjugate
+jf_minor_equals_adjugate_entry : Det -> Adjugate
+  cx O(1) idem
+
+# Sum over all k of adj(zI-A)_{kk} = tr(adj(zI-A))
+# This completes: d/dz det(zI-A) = tr(adj(zI-A))
+jf_sum_diagonal_is_trace : Adjugate -> Trace
+  cx O(1) idem
+
+graph jacobi_formula : Matrix -> Trace
+  flow in -> jf_leibniz_expand -> jf_differentiate_product -> jf_filter_diagonal_contributions -> jf_collect_minor_per_position -> jf_minor_equals_adjugate_entry -> jf_sum_diagonal_is_trace -> out
+
+# ═══════════════════════════════════════════════════════════════
+# THEOREM 3: Leibniz Formula Degree Bound
+# deg(det(M)) ≤ n where n = number of parameter-dependent entries
+# ═══════════════════════════════════════════════════════════════
+
+# Expand det(M) = Σ_{σ∈S_N} sgn(σ) Π_{i=1}^N M_{i,σ(i)}
+# Each term is a product of N matrix entries
+lb_expand_det_leibniz : Matrix -> Sum
+  cx O(1) idem
+
+# Classify entries: at most n have degree 1 in parameters,
+# remaining N-n entries have degree 0 (constants)
+lb_classify_entry_degrees : Sum -> Product
+  cx O(1) idem
+
+# Each product's degree = count of degree-1 factors selected
+# Since at most n factors have degree 1, each product has degree ≤ n
+lb_bound_product_degree : Product -> Degree
+  cx O(1) idem
+
+# The determinant is a sum of products each of degree ≤ n
+# Sum of degree-≤-n polynomials has degree ≤ n
+lb_sum_preserves_bound : Degree -> Degree
+  cx O(1) idem
+
+# Conclude: deg(det(M)) ≤ n
+lb_conclude : Degree -> Bool
+  cx O(1) idem
+
+graph leibniz_degree_bound : Matrix -> Bool
+  flow in -> lb_expand_det_leibniz -> lb_classify_entry_degrees -> lb_bound_product_degree -> lb_sum_preserves_bound -> lb_conclude -> out
+
+# ═══════════════════════════════════════════════════════════════
+# THEOREM 4: Partial Fractions Uniqueness
+# If f(s) = Σ_j c_j/(s - p_j) with distinct poles p_j,
+# then residues c_j are uniquely determined.
+# ═══════════════════════════════════════════════════════════════
+
+# Start with partial fraction form f(s) = Σ_j c_j/(s - p_j)
+# Multiply both sides by (s - p_k) for a chosen pole p_k
+pf_multiply_by_pole_factor : RationalFunc -> RationalFunc
+  cx O(1) idem
+
+# The k-th term simplifies: (s - p_k) · c_k/(s - p_k) = c_k
+# All cross terms j≠k: (s - p_k) · c_j/(s - p_j) remain rational
+pf_simplify_target_term : RationalFunc -> Residue
+  cx O(1) idem
+
+# Take limit s → p_k: cross terms (p_k - p_k)·c_j/(p_k - p_j) = 0
+# since numerator vanishes and denominator p_k - p_j ≠ 0 (distinct poles)
+pf_limit_cross_terms_vanish : Residue -> Limit
+  cx O(1) idem
+
+# Therefore c_k = lim_{s→p_k} (s - p_k) f(s)
+# The residue is uniquely determined by f and the pole location
+pf_residue_determined : Limit -> Residue
+  cx O(1) idem
+
+# Apply to every pole: each c_k is uniquely determined
+# If two representations agree as functions, all residues match
+pf_global_uniqueness : Residue -> Bool
+  cx O(1) idem
+
+graph partial_fractions_uniqueness : RationalFunc -> Bool
+  flow in -> pf_multiply_by_pole_factor -> pf_simplify_target_term -> pf_limit_cross_terms_vanish -> pf_residue_determined -> pf_global_uniqueness -> out

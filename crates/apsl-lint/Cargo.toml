@@ -1,0 +1,16 @@
+[package]
+name = "apsl-lint"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "apsl-lint"
+path = "src/main.rs"
+
+[dependencies]
+apsl-core.workspace = true
+apsl-link.workspace = true
+apsl-parse.workspace = true
+apsl-types.workspace = true
+apsl-complex = { path = "../apsl-complex" }
+apsl-smt.workspace = true

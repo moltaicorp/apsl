@@ -1,0 +1,216 @@
+# decomp-round4b.apsl — Atomic decomposition of 3 proof nodes
+#
+# Each sub-node is exactly ONE logical primitive:
+#   definition unfolding, substitution of equals,
+#   universal/existential instantiation, or modus ponens.
+#
+# Nodes decomposed:
+#   1. isospectral_to_trace_powers  : EqualEigenvalues -> EqualTracePowers
+#   2. sz_apply_base_case           : UnivPoly -> RootWitness
+#   3. sz_apply_ih_to_leading_coeff : IHContext -> EvaluationWitness
+
+
+# ════════════════════════════════════════════════════════════
+# TYPES
+# ════════════════════════════════════════════════════════════
+
+type Matrix = (String, String)
+type Nat = (String, String, String)
+type Scalar = (String, String, String, String)
+type Polynomial = (String, String, String, String, String)
+type FiniteSet = (String, String, String, String, String, String)
+type Point = (String, String, String, String, String, String, String)
+
+# --- Node 1 types: isospectral_to_trace_powers ---
+
+type EqualEigenvalues = (Matrix, Matrix)
+  # Witness: multiset of eigenvalues of A equals multiset of eigenvalues of B
+
+type TraceDefExpanded = (Matrix, Nat, String)
+  # tr(A^k) = Sigma_i (A^k)_{ii} — definition of trace applied
+
+type EigendecompExists = (Matrix, Matrix, Matrix)
+  # A = Q Lambda Q^T — eigendecomposition of symmetric matrix A
+
+type PowerEigendecomp = (Matrix, Matrix, Nat, String)
+  # A^k = Q Lambda^k Q^T — k-th power via eigendecomposition
+
+type TracePowerCyclic = (Matrix, Nat, String, String)
+  # tr(A^k) = tr(Q Lambda^k Q^T) = tr(Lambda^k) — cyclic property
+
+type TraceDiagSum = (Matrix, Nat, String, String, String)
+  # tr(Lambda^k) = Sigma_i lambda_i^k — trace of diagonal matrix
+
+type EqualLambdaSums = (Matrix, Matrix, Nat, String, String)
+  # Sigma_i lambda_i^k(A) = Sigma_i lambda_i^k(B) — from equal multisets
+
+type EqualTracePowers = (Matrix, Matrix, Nat, String, String, String)
+  # tr(A^k) = tr(B^k) — conclusion
+
+# --- Node 2 types: sz_apply_base_case ---
+
+type UnivPoly = (Polynomial, Nat, FiniteSet)
+  # (f, d, S) where f is univariate of degree d, |S| > d
+
+type DegreeZeroConstant = Polynomial
+  # Base case: degree-0 poly is a nonzero constant with 0 roots
+
+type BaseRootBound = (Polynomial, Nat, String)
+  # Degree-0 polynomial has <= 0 roots
+
+type HasRoot = (Polynomial, Scalar)
+  # f(r) = 0 — polynomial f has root r
+
+type FactorTheorem = (Polynomial, Polynomial, Scalar)
+  # f(x) = (x - r) * g(x) where deg(g) = deg(f) - 1
+
+type QuotientRootBound = (Polynomial, Nat, String, String)
+  # By induction: g has <= d-1 roots
+
+type RootUnionBound = (Polynomial, Nat, String, String, String)
+  # Roots of f = {r} union roots of g, so |roots(f)| <= d
+
+type RootWitness = (FiniteSet, Polynomial)
+  # |S| > d >= |roots(f)| implies exists s in S with f(s) != 0
+
+# --- Node 3 types: sz_apply_ih_to_leading_coeff ---
+
+type MultiPoly = (String, String, String, String, String, String, String, String)
+
+type IHContext = (MultiPoly, Nat, Nat, FiniteSet)
+  # (f, m, d, S) where f in R[x_1,...,x_m] nonzero, deg(f) = d, |S| > d
+
+type LeadingDecomp = (MultiPoly, MultiPoly, Nat)
+  # f = Sigma_{i=0}^{d'} g_i(x_1,...,x_{m-1}) * x_m^i, g_{d'} != 0, d' <= d
+
+type LeadingCoeffPoly = (MultiPoly, Nat, Nat)
+  # g_{d'} in R[x_1,...,x_{m-1}], nonzero, deg(g_{d'}) <= d - d'
+
+type IHStatement = (Nat, Nat, FiniteSet)
+  # IH: for any nonzero poly in m-1 vars of degree <= D with |S| > D,
+  # there exists a in S^{m-1} where it is nonzero
+
+type IHInstantiated = (MultiPoly, Nat, FiniteSet)
+  # g_{d'} has m-1 variables, degree <= d - d', |S| > d >= d - d'
+
+type EvaluationWitness = (Point, MultiPoly)
+  # exists a in S^{m-1} with g_{d'}(a) != 0
+
+
+# ════════════════════════════════════════════════════════════
+# NODE 1: isospectral_to_trace_powers
+# EqualEigenvalues -> EqualTracePowers
+#
+# Equal eigenvalue multisets imply equal trace power sums.
+# Each step: unfold def, substitute, instantiate, or modus ponens.
+# ════════════════════════════════════════════════════════════
+
+# Step 1: Definition unfolding — tr(A^k) = Sigma_i (A^k)_{ii}
+unfold_trace_def : EqualEigenvalues -> TraceDefExpanded
+  cx O(1) idem
+
+# Step 2: Modus ponens — A symmetric => A = Q Lambda Q^T (eigendecomposition theorem)
+apply_eigendecomp : TraceDefExpanded -> EigendecompExists
+  cx O(1) idem
+
+# Step 3: Substitution — A^k = (Q Lambda Q^T)^k = Q Lambda^k Q^T
+substitute_power : EigendecompExists -> PowerEigendecomp
+  cx O(1) idem
+
+# Step 4: Substitution — tr(A^k) = tr(Q Lambda^k Q^T) = tr(Lambda^k) by cyclic trace
+apply_cyclic_trace : PowerEigendecomp -> TracePowerCyclic
+  cx O(1) idem
+
+# Step 5: Definition unfolding — tr(Lambda^k) = Sigma_i lambda_i^k (diagonal trace)
+unfold_diag_trace : TracePowerCyclic -> TraceDiagSum
+  cx O(1) idem
+
+# Step 6: Substitution — equal eigenvalue multisets => equal lambda_i (up to reordering)
+substitute_equal_eigenvalues : (EqualEigenvalues, TraceDiagSum) -> EqualLambdaSums
+  cx O(1) idem
+
+# Step 7: Modus ponens — Sigma_i lambda_i^k symmetric under reordering => sums equal
+symmetric_sum_equal : EqualLambdaSums -> EqualTracePowers
+  cx O(1) idem
+
+graph isospectral_to_trace_powers : EqualEigenvalues -> EqualTracePowers
+  flow in -> unfold_trace_def -> apply_eigendecomp -> substitute_power -> apply_cyclic_trace -> unfold_diag_trace
+  flow (in, unfold_diag_trace) -> substitute_equal_eigenvalues -> symmetric_sum_equal -> out
+
+
+# ════════════════════════════════════════════════════════════
+# NODE 2: sz_apply_base_case
+# UnivPoly -> RootWitness
+#
+# Univariate polynomial of degree d has <= d roots.
+# Therefore |S| > d implies exists s in S with f(s) != 0.
+# Proof by induction on degree with factor theorem.
+# ════════════════════════════════════════════════════════════
+
+# Step 1: Definition unfolding — degree-0 polynomial is a nonzero constant
+unfold_degree_zero : UnivPoly -> DegreeZeroConstant
+  cx O(1) idem
+
+# Step 2: Modus ponens — nonzero constant has no roots, so 0 roots <= 0 = deg
+base_case_zero_roots : DegreeZeroConstant -> BaseRootBound
+  cx O(1) idem
+
+# Step 3: Instantiation — suppose f has a root r, i.e., f(r) = 0
+instantiate_root : UnivPoly -> HasRoot
+  cx O(1) idem
+
+# Step 4: Modus ponens — f(r) = 0 => f(x) = (x - r) * g(x) by factor theorem
+apply_factor_theorem : HasRoot -> FactorTheorem
+  cx O(1) idem
+
+# Step 5: Modus ponens — by induction hypothesis, g has <= d-1 roots
+apply_ih_to_quotient : FactorTheorem -> QuotientRootBound
+  cx O(1) idem
+
+# Step 6: Substitution — roots(f) = {r} union roots(g), so |roots(f)| <= 1 + (d-1) = d
+union_root_bound : (HasRoot, QuotientRootBound) -> RootUnionBound
+  cx O(1) idem
+
+# Step 7: Modus ponens — |S| > d >= |roots(f)| => exists s in S with f(s) != 0 (pigeonhole)
+pigeonhole_witness : (UnivPoly, RootUnionBound) -> RootWitness
+  cx O(1) idem
+
+graph sz_apply_base_case : UnivPoly -> RootWitness
+  flow in -> unfold_degree_zero -> base_case_zero_roots
+  flow in -> instantiate_root -> apply_factor_theorem -> apply_ih_to_quotient
+  flow (instantiate_root, apply_ih_to_quotient) -> union_root_bound
+  flow (in, union_root_bound) -> pigeonhole_witness -> out
+
+
+# ════════════════════════════════════════════════════════════
+# NODE 3: sz_apply_ih_to_leading_coeff
+# IHContext -> EvaluationWitness
+#
+# Schwartz-Zippel induction step: apply IH to the leading
+# coefficient of f when decomposed over the last variable.
+# ════════════════════════════════════════════════════════════
+
+# Step 1: Definition unfolding — write f = Sigma_{i=0}^{d'} g_i * x_m^i, extract g_{d'} != 0
+decompose_last_variable : IHContext -> LeadingDecomp
+  cx O(1) idem
+
+# Step 2: Substitution — g_{d'} is in R[x_1,...,x_{m-1}], deg(g_{d'}) <= d - d'
+extract_leading_coeff_properties : LeadingDecomp -> LeadingCoeffPoly
+  cx O(1) idem
+
+# Step 3: Instantiation — state the IH: for m-1 variables, nonzero poly of degree D over S with |S|>D has a nonzero point
+state_induction_hypothesis : IHContext -> IHStatement
+  cx O(1) idem
+
+# Step 4: Substitution — g_{d'} satisfies IH premises: m-1 vars, deg <= d - d', |S| > d >= d - d'
+verify_ih_premises : (LeadingCoeffPoly, IHStatement) -> IHInstantiated
+  cx O(1) idem
+
+# Step 5: Modus ponens — IH applies: exists a in S^{m-1} with g_{d'}(a) != 0
+apply_ih : IHInstantiated -> EvaluationWitness
+  cx O(1) idem
+
+graph sz_apply_ih_to_leading_coeff : IHContext -> EvaluationWitness
+  flow in -> decompose_last_variable -> extract_leading_coeff_properties
+  flow in -> state_induction_hypothesis
+  flow (extract_leading_coeff_properties, state_induction_hypothesis) -> verify_ih_premises -> apply_ih -> out

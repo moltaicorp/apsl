@@ -1,0 +1,318 @@
+# decomp-critical-node.apsl — Tautological decomposition of the claim:
+#
+# "Equal spectral Markov multisets MM^spec(G1; V, ε) = MM^spec(G2; V, ε)
+#  for all (V, ε) implies existence of a FIXED bijection σ on probes
+#  such that per-probe cofactor multisets are equal."
+#
+# The spectral Markov multiset is:
+#   MM^spec(G; V, ε) = {{ {{ c_f(z; V, ε) : f ∈ F }} : j ∈ [n] }}
+#
+# where c_f is the cofactor polynomial (diagonal of adjugate of zI - H_j).
+#
+# DECOMPOSITION STRATEGY:
+# Each step is one of:
+#   - Definition unfolding (tautological)
+#   - Modus ponens (A and A→B gives B, where A→B is tautological or proved)
+#   - Universal instantiation (∀x.P(x) and term t gives P(t))
+#   - Substitution of equals
+#
+# Steps that are NOT one of these are marked: # ASSERTION: requires proof that <claim>
+
+
+# ════════════════════════════════════════════════════════════
+# TYPES (structurally unique tuples)
+# ════════════════════════════════════════════════════════════
+
+# --- Domain objects ---
+
+type ProbeIndex = Int
+
+type Graph = (Int, Int)
+
+type CofactorPoly = (Int, Int, Int)
+
+type Parameter = (Int, Int, Int, Int)
+
+# --- Multiset-level types ---
+
+# Inner multiset for probe j: {{ c_f(z; V, ε) : f ∈ F }}
+type InnerMultiset = (Int, Int, Int, Int, Int)
+
+# Outer multiset (the SMM): {{ M_j : j ∈ [n] }}
+type OuterMultiset = (Int, Int, Int, Int, Int, Int)
+
+# The SMM equality hypothesis: MM^spec(G1; V, ε) = MM^spec(G2; V, ε) for all (V, ε)
+type SMMEqualAllParams = (OuterMultiset, OuterMultiset, Parameter)
+
+# --- Step result types ---
+
+# The outer multisets are equal as multisets (unpacked from universal)
+type OuterMultisetsEqualAtPoint = (OuterMultiset, OuterMultiset)
+
+# Multiset pairing: a bijection τ_{V,ε} pairing elements of the two outer multisets
+type ParameterDependentPairing = (Int, Int, Int, Int, Int, Int, Int)
+
+# The inner multisets matched under τ are equal
+type PairedInnersEqual = (InnerMultiset, InnerMultiset, Int)
+
+# Whether all inner multisets in a given outer multiset are distinct
+type AllInnersDistinct = (OuterMultiset, Int, Int)
+
+# Whether the pairing τ is unique when inners are distinct
+type PairingUnique = (ParameterDependentPairing, AllInnersDistinct, Int)
+
+# A specific (V0, ε0) where all inners are distinct
+type GenericPoint = (Parameter, AllInnersDistinct)
+
+# The fixed bijection σ defined at the generic point
+type FixedBijection = (Int, Int, Int, Int, Int, Int, Int, Int)
+
+# Per-probe cofactor multiset equality under σ at the generic point
+type PerProbeEqualAtGeneric = (FixedBijection, InnerMultiset, Int, Int)
+
+# Per-probe cofactor multiset equality under σ at ALL parameters
+type PerProbeEqualAllParams = (FixedBijection, InnerMultiset, Int, Int, Int)
+
+# The final claim
+type FixedBijectionWithPerProbeEquality = (FixedBijection, PerProbeEqualAllParams)
+
+
+# ════════════════════════════════════════════════════════════
+# STEP 1: Definition unfolding — unpack SMM equality
+#
+# By definition, MM^spec(G1; V, ε) = MM^spec(G2; V, ε) means:
+# for each (V, ε), the two outer multisets are equal as multisets.
+# This is LITERALLY what the hypothesis says. Tautological.
+# ════════════════════════════════════════════════════════════
+
+unpack_smm_equality : SMMEqualAllParams -> OuterMultisetsEqualAtPoint
+  cx    O(1) idem
+  # Definition unfolding: universal SMM equality at a point is
+  # just the outer multisets being equal at that point.
+  # (Universal instantiation on the parameter.)
+
+
+# ════════════════════════════════════════════════════════════
+# STEP 2: Definition unfolding — multiset equality implies pairing
+#
+# Two finite multisets are equal iff there exists a bijection
+# between their underlying indexed elements that pairs equal entries.
+# {{ M_j : j ∈ [n] }} = {{ M'_j : j ∈ [n] }}
+# iff ∃ permutation τ : [n] → [n] s.t. M_{τ(j)} = M'_j for all j.
+#
+# This IS the definition of multiset equality. Tautological.
+# But NOTE: τ depends on (V, ε) — it is a PARAMETER-DEPENDENT pairing.
+# ════════════════════════════════════════════════════════════
+
+multiset_equal_implies_pairing : OuterMultisetsEqualAtPoint -> ParameterDependentPairing
+  cx    O(1) idem
+  # Definition unfolding: equal multisets of n elements means there
+  # is a permutation τ_{V,ε} of [n] pairing equal elements.
+
+
+# ════════════════════════════════════════════════════════════
+# STEP 3: Definition unfolding — paired elements are equal
+#
+# Under the pairing τ from Step 2, for each j:
+#   M_{τ(j)}(G1; V, ε) = M'_j(G2; V, ε)
+# where M_j is the inner multiset {{ c_f(z; V, ε) : f ∈ F }}.
+#
+# This is just unpacking what "τ is a pairing" means. Tautological.
+# ════════════════════════════════════════════════════════════
+
+pairing_implies_inners_equal : ParameterDependentPairing -> PairedInnersEqual
+  cx    O(1) idem
+  # Definition unfolding: the pairing τ maps j to τ(j) with equal
+  # inner multisets. This is what "pairing" means.
+
+
+# ════════════════════════════════════════════════════════════
+# STEP 4: ASSERTION — Generic distinctness of inner multisets
+#
+# CLAIM: There exists a "generic" parameter (V0, ε0) at which
+# ALL inner multisets in the outer multiset of G1 are DISTINCT:
+#   j1 ≠ j2 => M_{j1}(G1; V0, ε0) ≠ M_{j2}(G1; V0, ε0)
+#
+# This is NOT a definition or tautology. It is a claim about
+# the algebraic geometry of the cofactor polynomials.
+# It requires proving that the "discriminant locus" (the set
+# of parameters where two different probes produce identical
+# cofactor multisets) has measure zero / is a proper algebraic
+# subvariety.
+#
+# This is essentially Theorem 7.3 (Ω_j ≢ 0) — the discriminant
+# polynomial is not identically zero.
+# ════════════════════════════════════════════════════════════
+
+assert_generic_distinctness : SMMEqualAllParams -> GenericPoint
+  cx    O(1) idem
+  # ASSERTION: requires proof that for graphs in the target class,
+  # the Fock-level discriminant Ω_j is not identically zero, i.e.,
+  # there exists (V0, ε0) where all inner multisets M_j are distinct.
+  # This fails for the rank-80 blind class where Ω_j ≡ 0.
+
+
+# ════════════════════════════════════════════════════════════
+# STEP 5: Modus ponens — distinct inners make pairing unique
+#
+# TAUTOLOGY (combinatorial): If a multiset has all-distinct elements,
+# then equality of two such multisets determines a UNIQUE bijection.
+#
+# Proof: If {{ a_1, ..., a_n }} = {{ b_1, ..., b_n }} and all a_i
+# are distinct, then each a_i appears exactly once, so b_i = a_{σ(i)}
+# for a unique permutation σ.
+#
+# This is a theorem of finite combinatorics (multiset with distinct
+# elements is a set; bijection between equal finite sets is unique
+# up to the identity on equal elements). Tautological.
+# ════════════════════════════════════════════════════════════
+
+# Step 4b: Projection — extract AllInnersDistinct from GenericPoint
+extract_distinctness : GenericPoint -> AllInnersDistinct
+  cx    O(1) idem
+  # Conjunction elimination: GenericPoint witnesses both the
+  # parameter choice and the distinctness claim. Extract distinctness.
+
+distinct_inners_unique_pairing : (ParameterDependentPairing, AllInnersDistinct) -> PairingUnique
+  cx    O(1) idem
+  # Modus ponens: (pairing exists) ∧ (all elements distinct) →
+  # (pairing is unique). The implication is a tautology of
+  # finite multiset theory.
+
+
+# ════════════════════════════════════════════════════════════
+# STEP 6: Substitution — define σ as the unique pairing at generic point
+#
+# At the generic point (V0, ε0) from Step 4, the pairing τ_{V0,ε0}
+# is unique by Step 5. Define σ := τ_{V0,ε0}. This is a fixed
+# (parameter-independent) bijection on [n].
+#
+# Tautological: defining σ as a specific instance of τ is just naming.
+# ════════════════════════════════════════════════════════════
+
+define_fixed_bijection : (PairingUnique, GenericPoint) -> FixedBijection
+  cx    O(1) idem
+  # Substitution: instantiate the unique pairing at the generic
+  # point and NAME it σ. Pure definition.
+
+
+# ════════════════════════════════════════════════════════════
+# STEP 7: Substitution — σ gives per-probe equality at generic point
+#
+# By Steps 2-3, at (V0, ε0), the pairing τ_{V0,ε0} satisfies:
+#   M_{τ(j)}(G1; V0, ε0) = M'_j(G2; V0, ε0)
+# Since σ = τ_{V0,ε0} (Step 6), we get:
+#   M_{σ(j)}(G1; V0, ε0) = M'_j(G2; V0, ε0)
+#
+# Tautological: substitution of equals (σ = τ_{V0,ε0}).
+# ════════════════════════════════════════════════════════════
+
+sigma_gives_equality_at_generic : (FixedBijection, PairedInnersEqual) -> PerProbeEqualAtGeneric
+  cx    O(1) idem
+  # Substitution of equals: replace τ_{V0,ε0} with σ.
+
+
+# ════════════════════════════════════════════════════════════
+# STEP 8: ASSERTION — σ works at ALL parameters, not just (V0, ε0)
+#
+# CLAIM: The fixed bijection σ (defined at the generic point)
+# also gives per-probe cofactor multiset equality at EVERY (V, ε):
+#   M_{σ(j)}(G1; V, ε) = M'_j(G2; V, ε)   for all (V, ε)
+#
+# This is NOT a tautology. At other parameters (V, ε), the pairing
+# τ_{V,ε} might differ from σ. The proof needs:
+#
+# (a) If all inners are still distinct at (V, ε), then τ_{V,ε} is
+#     unique, so τ_{V,ε} = σ. (This uses continuity/analyticity:
+#     both τ's are permutations that vary discretely in continuous
+#     parameters, so they must agree on connected components.)
+#
+# (b) At parameters where inners COLLIDE (non-generic), the equality
+#     M_{σ(j)} = M'_j holds by analytic continuation — the cofactor
+#     polynomials are equal as POLYNOMIALS (not just at one point),
+#     because polynomial equality is determined by equality on a
+#     Zariski-dense set.
+#
+# Sub-part (a) requires Step 4's assertion (generic distinctness).
+# Sub-part (b) is a genuine theorem (polynomial identity principle).
+# ════════════════════════════════════════════════════════════
+
+extend_sigma_to_all_params : PerProbeEqualAtGeneric -> PerProbeEqualAllParams
+  cx    O(1) idem
+  # ASSERTION: requires proof that:
+  # (1) The permutation τ_{V,ε} equals σ at all generic parameters
+  #     (by discreteness of S_n in continuous parameter space), AND
+  # (2) Polynomial identity principle: equality on Zariski-dense set
+  #     implies equality as polynomials.
+  # Both sub-claims are valid theorems, but neither is a definition
+  # unfolding or tautological step — they require the algebraic
+  # structure of the cofactor polynomials.
+  # CRITICALLY: sub-claim (1) requires that generic parameters exist
+  # (Step 4's assertion), which itself requires Ω_j ≢ 0.
+
+
+# ════════════════════════════════════════════════════════════
+# STEP 9: Conjunction introduction — assemble final claim
+#
+# We have σ (Step 6) and per-probe equality under σ (Step 8).
+# Package them together.
+#
+# Tautological: conjunction introduction.
+# ════════════════════════════════════════════════════════════
+
+assemble_conclusion : (FixedBijection, PerProbeEqualAllParams) -> FixedBijectionWithPerProbeEquality
+  cx    O(1) idem
+  # Conjunction introduction: (σ exists) ∧ (σ works) → conclusion.
+
+
+# ════════════════════════════════════════════════════════════
+# COMPOSITION GRAPH
+# ════════════════════════════════════════════════════════════
+
+graph decompose_smm_to_fixed_bijection : SMMEqualAllParams -> FixedBijectionWithPerProbeEquality
+  flow  in -> unpack_smm_equality -> multiset_equal_implies_pairing -> pairing_implies_inners_equal
+  flow  in -> assert_generic_distinctness
+  flow  assert_generic_distinctness -> extract_distinctness
+  flow  (multiset_equal_implies_pairing, extract_distinctness) -> distinct_inners_unique_pairing
+  flow  (distinct_inners_unique_pairing, assert_generic_distinctness) -> define_fixed_bijection
+  flow  (define_fixed_bijection, pairing_implies_inners_equal) -> sigma_gives_equality_at_generic
+  flow  sigma_gives_equality_at_generic -> extend_sigma_to_all_params
+  flow  (define_fixed_bijection, extend_sigma_to_all_params) -> assemble_conclusion -> out
+
+
+# ════════════════════════════════════════════════════════════
+# ANALYSIS SUMMARY
+# ════════════════════════════════════════════════════════════
+#
+# TAUTOLOGICAL STEPS (5):
+#   1. unpack_smm_equality          — universal instantiation
+#   2. multiset_equal_implies_pairing — definition of multiset equality
+#   3. pairing_implies_inners_equal — definition of pairing
+#   5. distinct_inners_unique_pairing — finite combinatorics tautology
+#   6. define_fixed_bijection       — naming/substitution
+#   7. sigma_gives_equality_at_generic — substitution of equals
+#   9. assemble_conclusion          — conjunction introduction
+#
+# ASSERTION STEPS (2):
+#   4. assert_generic_distinctness  — REQUIRES Ω_j ≢ 0 (Theorem 7.3)
+#   8. extend_sigma_to_all_params   — REQUIRES polynomial identity + Ω_j ≢ 0
+#
+# THE CRITICAL FAILURE POINT:
+#   Step 4 (assert_generic_distinctness) is where the proof fails
+#   for the blind class. If Ω_j ≡ 0, then NO generic point exists
+#   where all inner multisets are distinct. Without Step 4:
+#     - Step 5 cannot fire (no distinctness input)
+#     - Step 6 cannot define σ (no unique pairing)
+#     - Steps 7-9 collapse
+#
+#   Step 8 has a SECONDARY failure: even if σ were somehow defined,
+#   extending it to all parameters requires the discriminant to be
+#   generically nonzero (for the continuity argument). With Ω_j ≡ 0,
+#   the parameter-dependent pairing τ_{V,ε} can vary discontinuously
+#   across the entire parameter space.
+#
+# BOTTOM LINE:
+#   The proof decomposes into 7 tautological steps and 2 assertions.
+#   Both assertions depend on Ω_j ≢ 0. For graph classes where
+#   Ω_j ≡ 0 identically, the entire proof structure collapses at
+#   Step 4, making the fixed bijection σ undefined.

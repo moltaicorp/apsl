@@ -1,0 +1,424 @@
+# decomp-discriminant.apsl — Decomposition of the nonzero discriminant claim
+#
+# Theorem 7.3 precondition: the Fock-level discriminant polynomial
+#   Ω_j(V, ε) = Π_{α < β} r_{k(α,β)}^{(α,β)}(V, ε)
+# is claimed NONZERO for any connected graph G and any probe j.
+#
+# Each r_{k(α,β)}^{(α,β)} is a chosen nonzero (V,ε)-coefficient of the
+# cofactor difference c_{f_α}(z; V, ε) - c_{f_β}(z; V, ε), where
+# f_α, f_β are in different orbits of Stab(j) acting on Fock states.
+#
+# The overall claim "Ω_j ≠ 0" reduces to: for EVERY pair of distinct
+# orbits (f_α, f_β), the cofactor difference is not identically zero
+# as a polynomial in (z, V, ε).
+#
+# We decompose this mechanically. Each step is exactly one of:
+#   - definition unfolding
+#   - modus ponens
+#   - universal instantiation
+#   - substitution of equals
+#
+# Steps requiring unproved assertions are marked # ASSERTION.
+#
+# STRUCTURALLY UNIQUE TYPES: --strict requires every proposition type
+# to have a distinct structural signature. Achieved via unique tuple arities.
+
+
+# ═══════════════════════════════════════════════════════════
+# DOMAIN TYPES — each structurally unique
+# ═══════════════════════════════════════════════════════════
+
+type GraphG = Int
+
+type ProbeVertex = (Int, Int)
+
+type VertexCount = (Int, Int, Int)
+
+type FockDim = (Int, Int, Int, Int)
+
+type FockStateF = (Int, Int, Int, Int, Int)
+
+type FockStateG = (Int, Int, Int, Int, Int, Int)
+
+type AdjSym = (Int, Int, Int, Int, Int, Int, Int)
+
+type DiagPotential = (Int, Int, Int, Int, Int, Int, Int, Int)
+
+type ProbePerturbation = (Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+type HamiltonianHj = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+type StabJ = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+type OrbitPair = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+type SubmatrixDelF = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+type SubmatrixDelG = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+type CofactorF = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+type CofactorG = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+type CofactorDifference = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+type VECoefficient = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+type DiscriminantProduct = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+type DiscriminantNonzero = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+
+# ═══════════════════════════════════════════════════════════
+# PROPOSITION TYPES — each structurally unique
+# ═══════════════════════════════════════════════════════════
+
+type P_HjDefined = (GraphG, ProbeVertex)
+  # H_j is well-defined for graph G and probe j
+
+type P_CofactorsDefined = (GraphG, ProbeVertex, FockDim)
+  # All cofactors c_f(z;V,ε) are well-defined polynomials
+
+type P_StabJActs = (StabJ, FockDim)
+  # Stab(j) acts on Fock space, partitioning it into orbits
+
+type P_OrbitsPartition = (StabJ, FockDim, VertexCount)
+  # Fock states partitioned into orbits of Stab(j)
+
+type P_DistinctOrbitsExist = (OrbitPair, StabJ, FockDim)
+  # An arbitrary pair of distinct orbits is chosen
+
+type P_RepresentativesChosen = (FockStateF, FockStateG, OrbitPair)
+  # f_α ∈ O_α and f_β ∈ O_β chosen
+
+type P_DifferentStates = (FockStateF, FockStateG, StabJ)
+  # f_α ≠ f_β (different orbits => different states)
+
+type P_SubmatricesDefined = (SubmatrixDelF, SubmatrixDelG, HamiltonianHj)
+  # The two (N-1)×(N-1) submatrices exist
+
+type P_SubmatricesDifferByRowCol = (SubmatrixDelF, SubmatrixDelG, FockStateF, FockStateG)
+  # Submatrices differ in which row/col is deleted
+
+type P_RowColContentDiffers = (AdjSym, DiagPotential, ProbePerturbation, FockStateF, FockStateG)
+  # The row/col deleted in one has different content from the other
+
+type P_DiagonalEntryDiffers = (FockStateF, FockStateG, DiagPotential, AdjSym)
+  # (V·P)_{ff} ≠ (V·P)_{gg} for generic V when {a,b}≠{c,d}
+
+type P_RowFStructure = (FockStateF, AdjSym, GraphG, DiagPotential)
+  # Row f's adjacency structure in A^(sym) depends on G's edges at f
+
+type P_RowGStructure = (FockStateG, AdjSym, GraphG, DiagPotential)
+  # Row g's adjacency structure in A^(sym) depends on G's edges at g
+
+type P_DifferentRowsGeneric = (FockStateF, FockStateG, AdjSym, DiagPotential, ProbePerturbation)
+  # For generic V: submatrices (zI-H_j)^{(f)} and (zI-H_j)^{(g)} differ
+
+type P_CofactorDiffSinglePair = (CofactorF, CofactorG, CofactorDifference, OrbitPair)
+  # c_{f_α} - c_{f_β} ≢ 0 as polynomial in (z,V,ε)
+
+type P_NonzeroCoeffExists = (CofactorDifference, VECoefficient, OrbitPair)
+  # At least one z^k coefficient of (c_{f_α}-c_{f_β}) is nonzero in (V,ε)
+
+type P_FactorNonzero = (VECoefficient, OrbitPair, CofactorDifference)
+  # r_{k(α,β)}^{(α,β)}(V,ε) is nonzero
+
+type P_ProductOfNonzeroFactors = (DiscriminantProduct, VECoefficient, OrbitPair)
+  # Ω_j is finite product of nonzero polynomials
+
+type P_FiniteProductNonzero = (DiscriminantProduct, DiscriminantNonzero, VECoefficient)
+  # Ω_j(V,ε) ≢ 0 by integral domain property
+
+
+# ═══════════════════════════════════════════════════════════
+# INPUT TYPE — packs everything the graph needs
+# ═══════════════════════════════════════════════════════════
+
+type DiscriminantInput = (GraphG, ProbeVertex, VertexCount, FockDim, StabJ, HamiltonianHj, AdjSym, DiagPotential, ProbePerturbation, FockStateF, FockStateG, OrbitPair, CofactorF, CofactorG, CofactorDifference, VECoefficient, DiscriminantProduct, DiscriminantNonzero)
+
+
+# ═══════════════════════════════════════════════════════════
+# PROJECTION NODES — extract components from the input bundle
+# ═══════════════════════════════════════════════════════════
+
+extract_graph_probe : DiscriminantInput -> P_HjDefined
+  cx    O(1) idem
+
+extract_fock_dim : DiscriminantInput -> FockDim
+  cx    O(1) idem
+
+extract_stab_fock : DiscriminantInput -> P_StabJActs
+  cx    O(1) idem
+
+extract_vertex_count : DiscriminantInput -> VertexCount
+  cx    O(1) idem
+
+extract_hamiltonian : DiscriminantInput -> HamiltonianHj
+  cx    O(1) idem
+
+extract_stab_j : DiscriminantInput -> StabJ
+  cx    O(1) idem
+
+extract_fock_states : DiscriminantInput -> P_RepresentativesChosen
+  cx    O(1) idem
+
+extract_submatrix_context : DiscriminantInput -> P_RowColContentDiffers
+  cx    O(1) idem
+
+extract_cofactors : DiscriminantInput -> P_CofactorDiffSinglePair
+  cx    O(1) idem
+
+extract_orbit_pair : DiscriminantInput -> OrbitPair
+  cx    O(1) idem
+
+extract_coeff_context : DiscriminantInput -> P_NonzeroCoeffExists
+  cx    O(1) idem
+
+extract_discriminant_context : DiscriminantInput -> P_ProductOfNonzeroFactors
+  cx    O(1) idem
+
+extract_discriminant_target : DiscriminantInput -> DiscriminantNonzero
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 1: DEFINITION UNFOLDING — Define H_j
+# ═══════════════════════════════════════════════════════════
+# Unfold: H_j(V,ε) = A^(sym) + V·P + ε·Π_j
+
+unfold_hj_definition : P_HjDefined -> P_HjDefined
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 2: DEFINITION UNFOLDING — Define cofactors
+# ═══════════════════════════════════════════════════════════
+# Unfold: c_f(z;V,ε) = det((zI - H_j)^{(f)})
+
+unfold_cofactor_definition : (P_HjDefined, FockDim) -> P_CofactorsDefined
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 3: DEFINITION UNFOLDING — Stab(j) acts on Fock space
+# ═══════════════════════════════════════════════════════════
+
+unfold_stab_action : P_StabJActs -> P_StabJActs
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 4: MODUS PONENS — Group action partitions into orbits
+# ═══════════════════════════════════════════════════════════
+# Orbit-stabilizer theorem: group action on finite set => partition into orbits.
+
+orbits_partition : (P_StabJActs, VertexCount) -> P_OrbitsPartition
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 5: UNIVERSAL INSTANTIATION — Pick a pair of distinct orbits
+# ═══════════════════════════════════════════════════════════
+
+instantiate_orbit_pair : P_OrbitsPartition -> P_DistinctOrbitsExist
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 6: DEFINITION UNFOLDING — Choose orbit representatives
+# ═══════════════════════════════════════════════════════════
+
+choose_representatives : P_DistinctOrbitsExist -> P_RepresentativesChosen
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 7: MODUS PONENS — Different orbits => different states
+# ═══════════════════════════════════════════════════════════
+
+different_orbits_different_states : (P_RepresentativesChosen, StabJ) -> P_DifferentStates
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 8: DEFINITION UNFOLDING — Form the two submatrices
+# ═══════════════════════════════════════════════════════════
+
+form_submatrices : (P_DifferentStates, HamiltonianHj) -> P_SubmatricesDefined
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 9: SUBSTITUTION — Submatrices differ in deleted row/col
+# ═══════════════════════════════════════════════════════════
+
+submatrices_differ_by_deletion : P_SubmatricesDefined -> P_SubmatricesDifferByRowCol
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 10: DEFINITION UNFOLDING — Analyze row/col content
+# ═══════════════════════════════════════════════════════════
+
+unfold_row_col_content : P_SubmatricesDifferByRowCol -> P_RowColContentDiffers
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 11: SUBSTITUTION — Diagonal entries differ for generic V
+# ═══════════════════════════════════════════════════════════
+# (V·P)_{ff} = V_a + V_b for f = |a,b>.
+# For f = |a,b> and g = |c,d> with {a,b} ≠ {c,d}:
+# V_a + V_b ≠ V_c + V_d for generic V.
+# Valid because Fock states are canonically ordered (a≤b),
+# so different orbits => different underlying vertex pairs.
+
+diagonal_entries_differ : P_RowColContentDiffers -> P_DiagonalEntryDiffers
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 12: DEFINITION UNFOLDING — Row structure analysis
+# ═══════════════════════════════════════════════════════════
+# Row f of A^(sym) encodes Fock-space adjacencies at f,
+# which depend on graph edges incident to vertices in f.
+
+unfold_row_f_structure : P_DiagonalEntryDiffers -> P_RowFStructure
+  cx    O(1) idem
+
+unfold_row_g_structure : P_DiagonalEntryDiffers -> P_RowGStructure
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 13: MODUS PONENS — Different rows => different determinants
+# ═══════════════════════════════════════════════════════════
+#
+# # ASSERTION: different submatrix structure implies different
+# # determinants as polynomials in (z,V,ε).
+# #
+# # This is NOT a tautology. Two (N-1)×(N-1) submatrices of the
+# # same parent matrix, differing only in which row/col is deleted,
+# # CAN have equal determinants (cofactor coincidence / cospectrality).
+# #
+# # The assertion requires: for Fock-space Hamiltonians derived from
+# # connected graphs, the submatrices obtained by deleting different
+# # rows/cols are NOT cospectral as parametric families in (z,V,ε).
+# #
+# # FAILURE MODE: If there exists σ ∈ Aut(Γ) (Fock-space graph
+# # automorphism) with σ(f) = g, then c_f ≡ c_g identically.
+# # Such σ need not come from Stab(j). The Fock-space graph Γ can
+# # have automorphisms not induced by vertex permutations. The proof
+# # assumes these do not exist for connected graphs, but this requires
+# # a separate structural argument about the Fock lifting map.
+
+different_rows_imply_different_dets : (P_RowFStructure, P_RowGStructure) -> P_DifferentRowsGeneric
+  # ASSERTION: no Fock-level cospectral coincidence for connected graphs
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 14: MODUS PONENS — Cofactor difference is nonzero
+# ═══════════════════════════════════════════════════════════
+
+cofactor_diff_nonzero : P_DifferentRowsGeneric -> P_CofactorDiffSinglePair
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 15: MODUS PONENS — Extract a nonzero (V,ε)-coefficient
+# ═══════════════════════════════════════════════════════════
+# c_f - c_g = Σ_k (c_f - c_g)_k(V,ε) · z^k ≢ 0
+# => ∃ k such that (c_f - c_g)_k(V,ε) ≢ 0.
+
+extract_nonzero_coeff : P_CofactorDiffSinglePair -> P_NonzeroCoeffExists
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 16: SUBSTITUTION — Factor is nonzero for this orbit pair
+# ═══════════════════════════════════════════════════════════
+
+factor_is_nonzero : P_NonzeroCoeffExists -> P_FactorNonzero
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 17: UNIVERSAL GENERALIZATION — All orbit pairs contribute
+# ═══════════════════════════════════════════════════════════
+# Steps 6–16 hold for arbitrary (O_α, O_β).
+# Ω_j = Π_{α<β} r_{k(α,β)}^{(α,β)}(V,ε) is a finite product
+# of nonzero polynomials.
+
+all_factors_nonzero : P_FactorNonzero -> P_ProductOfNonzeroFactors
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# STEP 18: MODUS PONENS — Integral domain property
+# ═══════════════════════════════════════════════════════════
+# R[V_1,...,V_n,ε] is an integral domain.
+# Finite product of nonzero elements in an integral domain is nonzero.
+# Therefore Ω_j(V,ε) ≢ 0.
+
+product_nonzero : (P_ProductOfNonzeroFactors, DiscriminantNonzero) -> P_FiniteProductNonzero
+  cx    O(1) idem
+
+
+# ═══════════════════════════════════════════════════════════
+# MAIN GRAPH
+# ═══════════════════════════════════════════════════════════
+#
+# Input: DiscriminantInput (bundle of graph, probe, and all domain objects)
+# Output: P_FiniteProductNonzero (Ω_j ≢ 0)
+#
+# ─── ASSERTIONS IDENTIFIED ───────────────────────────────
+#
+# 1. Step 13 (different_rows_imply_different_dets):
+#    ASSERTION: for connected-graph Fock Hamiltonians, deleting
+#    different rows/cols always yields different cofactor polynomials.
+#
+#    This fails when the Fock-space graph Γ has automorphisms beyond
+#    those induced by vertex permutations. Specifically:
+#
+#    c_f ≡ c_g as polynomials in (z,V,ε) iff there exists a
+#    permutation σ of {1,...,N}\{f} → {1,...,N}\{g} such that
+#    (zI - H_j)^{(f)} and σ·(zI - H_j)^{(g)}·σ^{-1} are
+#    identical as parametric matrices.
+#
+#    At V=0, ε=0: reduces to whether A^(sym) has cospectral
+#    cofactors at positions f and g. The two-boson Fock lifting
+#    A → A^(sym) can create spectral coincidences not present
+#    in the original graph. For the rank-80 blind class, such
+#    coincidences cause Ω_j ≡ 0 identically.
+#
+#    STATUS: FALSE for the blind class. This is the failing node.
+
+graph discriminant_nonzero_claim : DiscriminantInput -> P_FiniteProductNonzero
+  flow  in -> extract_graph_probe
+  flow  in -> extract_fock_dim
+  flow  in -> extract_stab_fock
+  flow  in -> extract_vertex_count
+  flow  in -> extract_hamiltonian
+  flow  in -> extract_stab_j
+  flow  in -> extract_discriminant_target
+  flow  extract_graph_probe -> unfold_hj_definition
+  flow  (unfold_hj_definition, extract_fock_dim) -> unfold_cofactor_definition
+  flow  extract_stab_fock -> unfold_stab_action
+  flow  (unfold_stab_action, extract_vertex_count) -> orbits_partition
+  flow  orbits_partition -> instantiate_orbit_pair
+  flow  instantiate_orbit_pair -> choose_representatives
+  flow  (choose_representatives, extract_stab_j) -> different_orbits_different_states
+  flow  (different_orbits_different_states, extract_hamiltonian) -> form_submatrices
+  flow  form_submatrices -> submatrices_differ_by_deletion
+  flow  submatrices_differ_by_deletion -> unfold_row_col_content
+  flow  unfold_row_col_content -> diagonal_entries_differ
+  flow  diagonal_entries_differ -> unfold_row_f_structure
+  flow  diagonal_entries_differ -> unfold_row_g_structure
+  flow  (unfold_row_f_structure, unfold_row_g_structure) -> different_rows_imply_different_dets
+  flow  different_rows_imply_different_dets -> cofactor_diff_nonzero
+  flow  cofactor_diff_nonzero -> extract_nonzero_coeff
+  flow  extract_nonzero_coeff -> factor_is_nonzero
+  flow  factor_is_nonzero -> all_factors_nonzero
+  flow  (all_factors_nonzero, extract_discriminant_target) -> product_nonzero -> out

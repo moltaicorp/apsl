@@ -1,0 +1,137 @@
+# decomp-false-node.apsl — Decomposing the false implication
+#
+# The chain: EqualSMM -> EqualOuterCofactorMultisets
+# The claim: equal spectral Markov multisets imply equal outer cofactor multisets
+# The reality: there exists a class of graphs at rank ~80 where the
+#              spectral Markov multiset is identical but the graphs are
+#              non-isomorphic.
+#
+# We decompose the failing implication step by step to find exactly
+# where the reasoning breaks.
+
+# ─── TYPES (structurally unique) ──────────────────────────
+
+# The SMM is built from probability columns, which come from
+# time evolution, which comes from the Hamiltonian.
+# Each step in this chain is a SURJECTION (information-losing map).
+
+type Graph1 = (Int, Int)
+type Graph2 = (Int, Int, Int)
+type VertexSet = (Int, Int, Int, Int)
+
+# The Hamiltonian: H_j(V,ε) = A^(sym) + V·P + ε·Π_j
+# This is a 2-parameter family of N×N matrices where N = n(n+1)/2
+type FockDimension = (Int, Int, Int, Int, Int)
+type Hamiltonian = (Int, Int, Int, Int, Int, Int)
+type ParameterPair = (Int, Int, Int, Int, Int, Int, Int)
+
+# Time evolution: U_j(t) = e^{-iH_j t}
+# This is a UNITARY matrix — it preserves all information in H_j
+type TimeEvolution = (Int, Int, Int, Int, Int, Int, Int, Int)
+
+# Transition probability: |<a|U_j(t)|f>|^2
+# This is a SQUARED MODULUS — it LOSES PHASE INFORMATION
+type TransitionAmplitude = (Int, Int, Int, Int, Int, Int, Int, Int, Int)
+type TransitionProbability = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+# Probability column: sort the transition probabilities
+# Sorting LOSES LABEL INFORMATION — which Fock state produced which probability
+type ProbabilityColumn = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+# Walk multiset: multiset of probability columns over all initial states
+# Multiset formation LOSES ORDERING — which initial state gave which column
+type WalkMultiset = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+# Markov multiset: multiset-of-multisets over all probe vertices
+# Outer multiset LOSES PROBE IDENTITY — which vertex j produced which walk multiset
+type MarkovMultiset = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+# The spectral Markov multiset (cofactor-based, no time parameter)
+type SpectralMarkovMultiset = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+# The claim types
+type SMMEqual = (SpectralMarkovMultiset, SpectralMarkovMultiset)
+type CofactorMultisetsEqual = (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+
+# ─── THE INFORMATION LOSS CHAIN ──────────────────────────
+# Each step is labeled with what information it DESTROYS
+
+# Step 1: Graph -> Fock-space Hamiltonian
+# LOSSLESS: the adjacency matrix is fully encoded in A^(sym)
+graph_to_hamiltonian : (Graph1, Graph2, VertexSet) -> Hamiltonian
+  cx    O(1) idem
+
+# Step 2: Hamiltonian -> eigenvalues + eigenvectors
+# LOSSLESS: symmetric matrix is determined by its eigendecomposition
+hamiltonian_to_spectrum : Hamiltonian -> Hamiltonian
+  cx    O(1) idem
+
+# Step 3: Eigendecomposition -> transition amplitudes
+# LOSSLESS: unitary evolution preserves all spectral information
+spectrum_to_amplitudes : Hamiltonian -> TransitionAmplitude
+  cx    O(1) idem
+
+# Step 4: Amplitudes -> probabilities (SQUARED MODULUS)
+# *** LOSSY: phase information destroyed ***
+# |<a|U|f>|^2 discards the complex phase of the amplitude
+# Two different amplitudes with same modulus produce same probability
+amplitudes_to_probabilities : TransitionAmplitude -> TransitionProbability
+  cx    O(1) idem
+
+# Step 5: Probabilities -> sorted column
+# *** LOSSY: label permutation destroyed ***
+# Sorting discards which output state maps to which probability
+probabilities_to_column : TransitionProbability -> ProbabilityColumn
+  cx    O(1) idem
+
+# Step 6: Columns -> walk multiset
+# *** LOSSY: initial state identity destroyed ***
+# Multiset over initial states discards which starting state gave which column
+columns_to_walk_multiset : ProbabilityColumn -> WalkMultiset
+  cx    O(1) idem
+
+# Step 7: Walk multisets -> Markov multiset
+# *** LOSSY: probe vertex identity destroyed ***
+# Outer multiset discards which probe vertex j gave which walk multiset
+walk_to_markov_multiset : WalkMultiset -> MarkovMultiset
+  cx    O(1) idem
+
+# Step 8: Time-dependent MM -> spectral MM (cofactor-based, t-free)
+# The spectral version replaces time-dependent probabilities with
+# cofactor polynomials. This RECOVERS some information lost in Step 4
+# because cofactors are polynomials in (V,ε), not scalar probabilities.
+# But the sorting (Step 5) and multiset formation (Steps 6,7) losses remain.
+markov_to_spectral : MarkovMultiset -> SpectralMarkovMultiset
+  cx    O(1) idem
+
+# ─── THE FALSE IMPLICATION ───────────────────────────────
+
+# The completeness claim: if two graphs have equal spectral Markov
+# multisets for ALL (V,ε), then they have equal cofactor multisets
+# per probe (after relabeling).
+#
+# This requires INVERTING the information losses of Steps 5-7:
+#   - Recover probe identity from outer multiset (Step 7 inverse)
+#   - Recover initial state identity from inner multiset (Step 6 inverse)
+#   - Recover label ordering from sorted columns (Step 5 inverse)
+#
+# The proof argues this inversion is possible generically because:
+#   - Cofactors are polynomials, not scalars (richer than probabilities)
+#   - For generic (V,ε), the cofactors are distinct across orbits
+#   - The Fock-level discriminant Ω_j is nonzero (Theorem 7.3)
+#
+# THE FAILURE: Ω_j is NOT nonzero for all graph pairs.
+# For the rank-80 blind class, Ω_j ≡ 0 identically.
+# The two-boson Fock space invariant is inherently blind to
+# the structural difference between these graphs because the
+# information destroyed in Steps 5-7 is EXACTLY the information
+# that distinguishes them.
+
+# This node is the false one:
+smm_equality_implies_cofactor_equality : SMMEqual -> CofactorMultisetsEqual
+  cx    O(1) idem
+
+# It cannot be further decomposed into tautological steps because
+# the implication does not hold universally. The discriminant
+# polynomial is claimed nonzero but is in fact identically zero
+# for the blind class. No decomposition can rescue a false claim.

@@ -1,0 +1,9 @@
+[package]
+name = "apsl-link"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+apsl-core.workspace = true
+apsl-parse = { path = "../apsl-parse" }
+apsl-types = { path = "../apsl-types" }

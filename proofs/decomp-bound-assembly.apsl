@@ -1,0 +1,385 @@
+# decomp-bound-assembly.apsl — Atomic decomposition of DEGREE BOUND + ASSEMBLY
+#
+# Decomposes compound proof nodes from proof-n17-full.apsl into
+# atomic APSL primitives. Each node is a single logical inference step.
+#
+# Nodes decomposed:
+#   cofactor_degree_leibniz : Operator -> CofactorDegreeBound
+#   difference_degree       : CofactorDegreeBound -> DifferenceDegreeBound
+#   product_bound           : DifferenceDegreeBound -> DiscriminantDegreeBound
+#   schwartz_zippel_apply   : (DeterministicGrid, FockDegreeBoundN5) -> NonRootExists
+#   assemble_algorithm      : (MarkovMultisetEqual, AdjacencyEquality, NonRootExists) -> Algorithm
+#   theorem_gi_dtime_n17    : (Algorithm, MatrixEqual) -> MainTheorem
+
+
+# ─── DOMAIN TYPES ────────────────────────────────────────
+
+type Operator = (Int, Int)
+type Matrix = (Int, Int, Int)
+type Polynomial = (Int, Int, Int, Int)
+type Grid = (Int, Int, Int, Int, Int)
+type Graph = (Int, Int, Int, Int, Int, Int)
+type Int2 = (Int, Int, Int, Int, Int, Int, Int)
+
+# ─── PROPOSITION TYPES ───────────────────────────────────
+
+type CofactorDegreeBound = (Polynomial, Int2, Int)
+type DifferenceDegreeBound = (Polynomial, Int2, Int, Int)
+type DiscriminantDegreeBound = (Polynomial, Int2, Int, Int, Int)
+type FockDegreeBoundN5 = (Polynomial, Int2, Int, Int, Int, Int)
+type DeterministicGrid = (Grid, Int2, Int)
+type NonRootExists = (Grid, Polynomial, Int)
+type MarkovMultisetEqual = (Graph, Graph, Int)
+type AdjacencyEquality = (Matrix, Matrix, Int)
+type MatrixEqual = (Matrix, Matrix, Int, Int)
+type Algorithm = (Graph, Graph, Grid, Int)
+type ComplexityClass = (Int, Int, Int, Int, Int, Int, Int, Int)
+type MainTheorem = (Algorithm, ComplexityClass, Int)
+
+# --- cofactor_degree_leibniz intermediate types ---
+
+type HjIsNxNLinear = (Operator, Int)
+  # H_j(V,ε) is N×N matrix, linear in parameters (V,ε)
+
+type DiagonalVEDependence = (Operator, Int, Int)
+  # Exactly n diagonal entries carry (V,ε)-dependence (coincidence states)
+
+type DiagonalDegreeOne = (Operator, Int, Int, Int)
+  # Each coincidence diagonal entry has degree 1 in (V,ε)
+
+type OffDiagConstant = (Operator, Int, Int, Int, Int)
+  # Spread-state diagonals and all off-diagonals are constants (degree 0)
+
+type CofactorIsSubmatrixDet = (Operator, Polynomial, Int)
+  # Cofactor c_f = det of (N-1)×(N-1) submatrix
+
+type LeibnizTermProduct = (Operator, Polynomial, Int, Int)
+  # By Leibniz formula: each term in det is product of N-1 entries
+
+type CoincidenceCofactorBound = (Operator, Int2, Int)
+  # If f is coincidence state: only n-1 degree-1 diagonals remain → deg ≤ n-1
+
+type SpreadCofactorBound = (Operator, Int2, Int, Int)
+  # If f is spread state: all n degree-1 diagonals remain → deg ≤ n
+
+type WorstCaseBound = (Operator, Int2, Int, Int, Int)
+  # Worst case over all f: deg(c_f) ≤ n
+
+# --- difference_degree intermediate types ---
+
+type CofactorDifferencePoly = (Polynomial, Polynomial)
+  # For distinct f_α, f_β: c_{f_α} - c_{f_β} is a polynomial
+
+type DifferenceDegreeMaxBound = (Polynomial, Int2, Int, Int, Int, Int, Int)
+  # deg(c_{f_α} - c_{f_β}) ≤ max(deg(c_{f_α}), deg(c_{f_β})) ≤ n
+
+type ZCoeffDegreeBound = (Polynomial, Int2, Int, Int, Int, Int, Int, Int)
+  # Each z-coefficient r_k^{(α,β)}(V,ε) has degree ≤ n
+
+# --- product_bound intermediate types ---
+
+type OrbitPairCount = Int2
+  # Number of orbit pairs ≤ C(N,2) where N = n(n+1)/2
+
+type OneNonzeroCoeffPerPair = (Polynomial, Int2, Int, Int, Int, Int, Int, Int, Int)
+  # For each pair, one nonzero coefficient r_k has deg ≤ n
+
+type DiscriminantIsProduct = Polynomial
+  # Discriminant Ω_j = product of chosen coefficients
+
+type DiscriminantDegBound = (Polynomial, Int2, Int, Int, Int, Int, Int, Int, Int, Int)
+  # deg(Ω_j) ≤ n · C(N,2)
+
+# --- schwartz_zippel_apply intermediate types ---
+
+type OmegaNonzeroTwoVar = (Polynomial, Int2, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+  # Ω_j is nonzero polynomial in 2 variables of degree ≤ d = ⌈n⁵/8⌉
+
+type GridExceedsDegree = (Grid, Int2, Int, Int)
+  # Grid S has |S| = d+1 > d ≥ deg(Ω_j)
+
+type SchwartzZippelThm = (Grid, Polynomial, Int, Int)
+  # For nonzero f of degree d, ∃ point in S^m with f ≠ 0 when |S| > d
+
+type ApplyWithMTwo = (Grid, Polynomial, Int, Int, Int)
+  # Apply with m=2: ∃ (V₀,ε₀) ∈ S² with Ω_j(V₀,ε₀) ≠ 0
+
+# --- assemble_algorithm intermediate types ---
+
+type InputGraphs = (Graph, Graph, Int, Int)
+  # Input: two graphs G₁, G₂ on n vertices
+
+type GridEnumeration = (Graph, Graph, Grid, Int, Int)
+  # Enumerate grid S² of O(n¹⁰) parameter pairs
+
+type ComputeSMMPerPoint = (Graph, Graph, Grid, Int, Int, Int)
+  # For each (V,ε): compute SMM(G₁) and SMM(G₂)
+
+type CompareDistinguish = (Graph, Graph, Grid, Int, Int, Int, Int)
+  # Compare: if any (V,ε) distinguishes → non-isomorphic
+
+type CompletenessYieldsIso = (Graph, Graph, Int, Int, Int)
+  # If none distinguishes → isomorphic (by completeness)
+
+type AlgorithmCorrect = (Graph, Graph, Grid, Int, Int, Int, Int, Int)
+  # Algorithm is deterministic, finite, correct
+
+# --- theorem_gi_dtime_n17 intermediate types ---
+
+type GridSizeN10 = (Grid, Int2, Int, Int, Int)
+  # Grid: O(n¹⁰) parameter pairs
+
+type PerPairHamiltonians = (Operator, Int2, Int, Int, Int, Int)
+  # Per pair: compute H_j for n probes → n Hamiltonian constructions of O(N²) = O(n⁴)
+
+type PerHamiltonianEigen = (Operator, Int2, Int, Int, Int, Int, Int)
+  # Per Hamiltonian: eigendecomposition O(N³) = O(n⁶)
+
+type PerEigenCofactor = (Operator, Int2, Int, Int, Int, Int, Int, Int)
+  # Per eigendecomposition: cofactor extraction O(N²) = O(n⁴)
+
+type PerPairTotal = (Operator, Int2, Int, Int, Int, Int, Int, Int, Int)
+  # Total per pair: O(n · n⁶) = O(n⁷)
+
+type GridTimesPerPair = (Algorithm, Int2)
+  # Grid × per-pair: O(n¹⁰ · n⁷) = O(n¹⁷)
+
+type GIInDTIMEN17 = (Algorithm, ComplexityClass, Int, Int)
+  # GI ∈ DTIME(n¹⁷)
+
+
+# ═══════════════════════════════════════════════════════════
+# DECOMPOSITION OF cofactor_degree_leibniz : Operator -> CofactorDegreeBound
+# ═══════════════════════════════════════════════════════════
+#
+# H_j(V,ε) is N×N, linear in (V,ε). Exactly n diagonal entries carry
+# (V,ε)-dependence (coincidence states), each degree 1. Spread-state
+# diagonals and off-diagonals are degree 0. Cofactor = det of (N-1)×(N-1)
+# submatrix. By Leibniz each term is product of N-1 entries. At most n
+# factors have degree 1. Coincidence: deg ≤ n-1. Spread: deg ≤ n.
+# Worst case: deg(c_f) ≤ n.
+
+hj_is_nxn_linear : Operator -> HjIsNxNLinear
+  cx    O(1) idem
+
+diagonal_ve_dependence : HjIsNxNLinear -> DiagonalVEDependence
+  cx    O(1) idem
+
+diagonal_degree_one : DiagonalVEDependence -> DiagonalDegreeOne
+  cx    O(1) idem
+
+offdiag_constant : HjIsNxNLinear -> OffDiagConstant
+  cx    O(1) idem
+
+cofactor_is_submatrix_det : (DiagonalDegreeOne, OffDiagConstant) -> CofactorIsSubmatrixDet
+  cx    O(1) idem
+
+leibniz_term_product : CofactorIsSubmatrixDet -> LeibnizTermProduct
+  cx    O(1) idem
+
+coincidence_cofactor_bound : LeibnizTermProduct -> CoincidenceCofactorBound
+  cx    O(1) idem
+
+spread_cofactor_bound : LeibnizTermProduct -> SpreadCofactorBound
+  cx    O(1) idem
+
+worst_case_bound : (CoincidenceCofactorBound, SpreadCofactorBound) -> WorstCaseBound
+  cx    O(1) idem
+
+witness_cofactor_degree : WorstCaseBound -> CofactorDegreeBound
+  cx    O(1) idem
+
+graph cofactor_degree_leibniz : Operator -> CofactorDegreeBound
+  flow  in -> hj_is_nxn_linear
+  flow  hj_is_nxn_linear -> diagonal_ve_dependence -> diagonal_degree_one
+  flow  hj_is_nxn_linear -> offdiag_constant
+  flow  (diagonal_degree_one, offdiag_constant) -> cofactor_is_submatrix_det -> leibniz_term_product
+  flow  leibniz_term_product -> coincidence_cofactor_bound
+  flow  leibniz_term_product -> spread_cofactor_bound
+  flow  (coincidence_cofactor_bound, spread_cofactor_bound) -> worst_case_bound -> witness_cofactor_degree -> out
+
+
+# ═══════════════════════════════════════════════════════════
+# DECOMPOSITION OF difference_degree : CofactorDegreeBound -> DifferenceDegreeBound
+# ═══════════════════════════════════════════════════════════
+#
+# For distinct f_α, f_β: c_{f_α} - c_{f_β} is a polynomial.
+# deg(c_{f_α} - c_{f_β}) ≤ max(deg(c_{f_α}), deg(c_{f_β})) ≤ n.
+# Each z-coefficient r_k^{(α,β)}(V,ε) has degree ≤ n.
+
+form_cofactor_difference : CofactorDegreeBound -> CofactorDifferencePoly
+  cx    O(1) idem
+
+difference_degree_max : (CofactorDifferencePoly, CofactorDegreeBound) -> DifferenceDegreeMaxBound
+  cx    O(1) idem
+
+z_coeff_degree_bound : DifferenceDegreeMaxBound -> ZCoeffDegreeBound
+  cx    O(1) idem
+
+witness_difference_degree : ZCoeffDegreeBound -> DifferenceDegreeBound
+  cx    O(1) idem
+
+graph difference_degree : CofactorDegreeBound -> DifferenceDegreeBound
+  flow  in -> form_cofactor_difference
+  flow  (form_cofactor_difference, in) -> difference_degree_max -> z_coeff_degree_bound -> witness_difference_degree -> out
+
+
+# ═══════════════════════════════════════════════════════════
+# DECOMPOSITION OF product_bound : DifferenceDegreeBound -> DiscriminantDegreeBound
+# ═══════════════════════════════════════════════════════════
+#
+# Number of orbit pairs ≤ C(N,2) where N = n(n+1)/2.
+# For each pair, one nonzero coefficient r_k has deg ≤ n.
+# Discriminant Ω_j = product of chosen coefficients.
+# deg(Ω_j) ≤ n · C(N,2).
+
+count_orbit_pairs : DifferenceDegreeBound -> OrbitPairCount
+  cx    O(1) idem
+
+one_nonzero_coeff_per_pair : (DifferenceDegreeBound, OrbitPairCount) -> OneNonzeroCoeffPerPair
+  cx    O(1) idem
+
+discriminant_is_product : OneNonzeroCoeffPerPair -> DiscriminantIsProduct
+  cx    O(1) idem
+
+discriminant_deg_bound : (DiscriminantIsProduct, OrbitPairCount) -> DiscriminantDegBound
+  cx    O(1) idem
+
+witness_discriminant_degree : DiscriminantDegBound -> DiscriminantDegreeBound
+  cx    O(1) idem
+
+graph product_bound : DifferenceDegreeBound -> DiscriminantDegreeBound
+  flow  in -> count_orbit_pairs
+  flow  (in, count_orbit_pairs) -> one_nonzero_coeff_per_pair -> discriminant_is_product
+  flow  (discriminant_is_product, count_orbit_pairs) -> discriminant_deg_bound -> witness_discriminant_degree -> out
+
+
+# ═══════════════════════════════════════════════════════════
+# DECOMPOSITION OF schwartz_zippel_apply : (DeterministicGrid, FockDegreeBoundN5) -> NonRootExists
+# ═══════════════════════════════════════════════════════════
+#
+# Ω_j is nonzero polynomial in 2 variables of degree ≤ d = ⌈n⁵/8⌉.
+# Grid S has |S| = d+1 > d ≥ deg(Ω_j).
+# By Schwartz-Zippel: for nonzero f of degree d, ∃ point in S^m with f ≠ 0
+# when |S| > d. Apply with m=2: ∃ (V₀,ε₀) ∈ S² with Ω_j(V₀,ε₀) ≠ 0.
+
+omega_nonzero_two_var : FockDegreeBoundN5 -> OmegaNonzeroTwoVar
+  cx    O(1) idem
+
+grid_exceeds_degree : (DeterministicGrid, OmegaNonzeroTwoVar) -> GridExceedsDegree
+  cx    O(1) idem
+
+cite_schwartz_zippel : GridExceedsDegree -> SchwartzZippelThm
+  cx    O(1) idem
+
+apply_with_m_two : SchwartzZippelThm -> ApplyWithMTwo
+  cx    O(1) idem
+
+witness_non_root : ApplyWithMTwo -> NonRootExists
+  cx    O(1) idem
+
+extract_grid_sz : (DeterministicGrid, FockDegreeBoundN5) -> DeterministicGrid
+  cx    O(1) idem
+
+extract_bound_sz : (DeterministicGrid, FockDegreeBoundN5) -> FockDegreeBoundN5
+  cx    O(1) idem
+
+graph schwartz_zippel_apply : (DeterministicGrid, FockDegreeBoundN5) -> NonRootExists
+  flow  in -> extract_bound_sz -> omega_nonzero_two_var
+  flow  in -> extract_grid_sz
+  flow  (extract_grid_sz, omega_nonzero_two_var) -> grid_exceeds_degree -> cite_schwartz_zippel -> apply_with_m_two -> witness_non_root -> out
+
+
+# ═══════════════════════════════════════════════════════════
+# DECOMPOSITION OF assemble_algorithm : (MarkovMultisetEqual, AdjacencyEquality, NonRootExists) -> Algorithm
+# ═══════════════════════════════════════════════════════════
+#
+# Input: two graphs G₁, G₂ on n vertices.
+# Enumerate grid S² of O(n¹⁰) parameter pairs.
+# For each (V,ε): compute SMM(G₁) and SMM(G₂).
+# Compare: if any (V,ε) distinguishes → non-isomorphic.
+# If none distinguishes → isomorphic (by completeness).
+# Algorithm is deterministic, finite, correct.
+
+fix_input_graphs : MarkovMultisetEqual -> InputGraphs
+  cx    O(1) idem
+
+enumerate_grid : (InputGraphs, NonRootExists) -> GridEnumeration
+  cx    O(1) idem
+
+compute_smm_per_point : GridEnumeration -> ComputeSMMPerPoint
+  cx    O(1) idem
+
+compare_and_distinguish : (ComputeSMMPerPoint, AdjacencyEquality) -> CompareDistinguish
+  cx    O(1) idem
+
+completeness_yields_iso : (CompareDistinguish, MarkovMultisetEqual) -> CompletenessYieldsIso
+  cx    O(1) idem
+
+algorithm_correct : (CompareDistinguish, CompletenessYieldsIso) -> AlgorithmCorrect
+  cx    O(1) idem
+
+witness_algorithm : AlgorithmCorrect -> Algorithm
+  cx    O(1) idem
+
+extract_mmequal : (MarkovMultisetEqual, AdjacencyEquality, NonRootExists) -> MarkovMultisetEqual
+  cx    O(1) idem
+
+extract_adjequal : (MarkovMultisetEqual, AdjacencyEquality, NonRootExists) -> AdjacencyEquality
+  cx    O(1) idem
+
+extract_nonroot : (MarkovMultisetEqual, AdjacencyEquality, NonRootExists) -> NonRootExists
+  cx    O(1) idem
+
+graph assemble_algorithm : (MarkovMultisetEqual, AdjacencyEquality, NonRootExists) -> Algorithm
+  flow  in -> extract_mmequal -> fix_input_graphs
+  flow  (fix_input_graphs, extract_nonroot) -> enumerate_grid -> compute_smm_per_point
+  flow  (compute_smm_per_point, extract_adjequal) -> compare_and_distinguish
+  flow  (compare_and_distinguish, extract_mmequal) -> completeness_yields_iso
+  flow  (compare_and_distinguish, completeness_yields_iso) -> algorithm_correct -> witness_algorithm -> out
+
+
+# ═══════════════════════════════════════════════════════════
+# DECOMPOSITION OF theorem_gi_dtime_n17 : (Algorithm, MatrixEqual) -> MainTheorem
+# ═══════════════════════════════════════════════════════════
+#
+# Grid: O(n¹⁰) parameter pairs.
+# Per pair: compute H_j for n probes → n Hamiltonian constructions of O(N²) = O(n⁴).
+# Per Hamiltonian: eigendecomposition O(N³) = O(n⁶).
+# Per eigendecomposition: cofactor extraction O(N²) = O(n⁴).
+# Total per pair: O(n · n⁶) = O(n⁷).
+# Grid × per-pair: O(n¹⁰ · n⁷) = O(n¹⁷).
+# GI ∈ DTIME(n¹⁷).
+
+grid_size_n10 : Algorithm -> GridSizeN10
+  cx    O(1) idem
+
+per_pair_hamiltonians : (Algorithm, MatrixEqual) -> PerPairHamiltonians
+  cx    O(1) idem
+
+per_hamiltonian_eigen : PerPairHamiltonians -> PerHamiltonianEigen
+  cx    O(1) idem
+
+per_eigen_cofactor : PerHamiltonianEigen -> PerEigenCofactor
+  cx    O(1) idem
+
+per_pair_total : (PerPairHamiltonians, PerEigenCofactor) -> PerPairTotal
+  cx    O(1) idem
+
+grid_times_per_pair : (GridSizeN10, PerPairTotal) -> GridTimesPerPair
+  cx    O(1) idem
+
+gi_in_dtime_n17 : GridTimesPerPair -> GIInDTIMEN17
+  cx    O(1) idem
+
+witness_main_theorem : GIInDTIMEN17 -> MainTheorem
+  cx    O(1) idem
+
+extract_algo : (Algorithm, MatrixEqual) -> Algorithm
+  cx    O(1) idem
+
+graph theorem_gi_dtime_n17 : (Algorithm, MatrixEqual) -> MainTheorem
+  flow  in -> extract_algo -> grid_size_n10
+  flow  in -> per_pair_hamiltonians -> per_hamiltonian_eigen -> per_eigen_cofactor
+  flow  (per_pair_hamiltonians, per_eigen_cofactor) -> per_pair_total
+  flow  (grid_size_n10, per_pair_total) -> grid_times_per_pair -> gi_in_dtime_n17 -> witness_main_theorem -> out

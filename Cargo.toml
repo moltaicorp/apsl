@@ -1,0 +1,47 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/apsl-core",
+    "crates/apsl-parse",
+    "crates/apsl-types",
+    "crates/apsl-complex",
+    "crates/apsl-smt",
+    "crates/apsl-cert",
+    "crates/apslc",
+    "crates/apsl-lint",
+    "crates/apsl-cert-cli",
+    "crates/apsl-link",
+    "crates/apsl-runtime",
+    "crates/apsl",
+    "crates/apsl-verify",
+    "crates/apsl-workbench",
+    "crates/apsl-artifact",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["H. Thomson Comer <thomcom@moltaicorp.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/moltaicorp/apsl"
+
+[workspace.dependencies]
+apsl-core = { path = "crates/apsl-core" }
+apsl-parse = { path = "crates/apsl-parse" }
+apsl-types = { path = "crates/apsl-types" }
+apsl-complex = { path = "crates/apsl-complex" }
+apsl-smt = { path = "crates/apsl-smt" }
+apsl-cert = { path = "crates/apsl-cert" }
+apsl-link = { path = "crates/apsl-link" }
+apsl-artifact = { path = "crates/apsl-artifact" }
+
+sha2 = "0.10"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
